@@ -2,10 +2,10 @@
 name = "cargo-ovft"
 version = "0.1.0"
 edition = "2021"
-authors = ["Your Name <your.email@example.com>"]
+authors = ["jFiedler24 <your.email@example.com>"]
 description = "A Cargo plugin for Open Very Fast Trace - requirements traceability for Rust projects"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/your-username/open-very-fast-trace"
+repository = "https://github.com/jFiedler24/open-very-fast-trace"
 keywords = ["requirements", "traceability", "testing", "documentation", "cargo"]
 categories = ["development-tools", "development-tools::cargo-plugins"]
 

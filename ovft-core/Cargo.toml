@@ -2,10 +2,10 @@
 name = "ovft-core"
 version = "0.1.0"
 edition = "2021"
-authors = ["Your Name <your.email@example.com>"]
-description = "Open Very Fast Trace - Core requirements tracing library"
+authors = ["jFiedler24 <your.email@example.com>"]
+description = "Core library for Open Very Fast Trace - requirements traceability for Rust projects"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/yourusername/open-very-fast-trace"
+repository = "https://github.com/jFiedler24/open-very-fast-trace"
 keywords = ["requirements", "tracing", "testing", "documentation"]
 categories = ["development-tools", "development-tools::testing"]
 
