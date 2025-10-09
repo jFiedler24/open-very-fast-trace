@@ -1,0 +1,11 @@
+[package]
+name = "ovft-example"
+version = "0.1.0"
+edition = "2021"
+description = "Example usage of Open Very Fast Trace in build.rs"
+
+[dependencies]
+ovft-core = { path = "../ovft-core" }
+
+[build-dependencies]
+ovft-core = { path = "../ovft-core" }

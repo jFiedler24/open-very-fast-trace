@@ -1,0 +1,41 @@
+[package]
+name = "ovft-core"
+version = "0.1.0"
+edition = "2021"
+authors = ["Your Name <your.email@example.com>"]
+description = "Open Very Fast Trace - Core requirements tracing library"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/yourusername/open-very-fast-trace"
+keywords = ["requirements", "tracing", "testing", "documentation"]
+categories = ["development-tools", "development-tools::testing"]
+
+[[bin]]
+name = "ovft"
+path = "src/bin/ovft.rs"
+
+[dependencies]
+regex.workspace = true
+walkdir.workspace = true
+glob.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+toml.workspace = true
+askama.workspace = true
+askama_escape.workspace = true
+clap.workspace = true
+pulldown-cmark.workspace = true
+pulldown-cmark-to-cmark.workspace = true
+env_logger.workspace = true
+log.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+pretty_assertions.workspace = true
+
+[lib]
+name = "ovft_core"
+path = "src/lib.rs"
+
+[package.metadata.askama]
+dirs = ["templates"]

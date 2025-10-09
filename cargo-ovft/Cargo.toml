@@ -1,0 +1,23 @@
+[package]
+name = "cargo-ovft"
+version = "0.1.0"
+edition = "2021"
+authors = ["Your Name <your.email@example.com>"]
+description = "A Cargo plugin for Open Very Fast Trace - requirements traceability for Rust projects"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/your-username/open-very-fast-trace"
+keywords = ["requirements", "traceability", "testing", "documentation", "cargo"]
+categories = ["development-tools", "development-tools::cargo-plugins"]
+
+[[bin]]
+name = "cargo-ovft"
+path = "src/main.rs"
+
+[dependencies]
+ovft-core = { path = "../ovft-core" }
+clap = { workspace = true, features = ["derive"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+env_logger = { workspace = true }
+anyhow = { workspace = true }

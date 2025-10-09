@@ -1,0 +1,162 @@
+# Rust/Cargo
+/target/
+**/target/
+**/*.rs.bk
+*.pdb
+Cargo.lock
+
+# Build artifacts
+debug/
+release/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Generated documentation
+/doc/
+
+# Generated HTML reports
+requirements_report.html
+**/requirements_report.html
+trace_report.html
+**/trace_report.html
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Test artifacts
+tests/tmp/
+tests/temp/
+
+# Coverage reports
+tarpaulin-report.html
+cobertura.xml
+lcov.info
+
+# Profiling data
+*.prof
+perf.data*
+
+# Package files
+*.tar.gz
+*.zip
+
+# Configuration files with secrets
+.env
+.env.local
+config/local.toml
+
+# Editor backups
+*~
+.#*
+#*#
+
+# Log files
+*.log
+logs/
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Node modules (if using JS tooling)
+node_modules/
+npm-debug.log*
+
+# Python (if using Python tools)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.env
+.venv
+env/
+venv/
+
+# JetBrains IDEs
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Visual Studio Code
+.vscode/
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# Vim
+*.swp
+*.swo
+*.un~
+Session.vim
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# MacOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
