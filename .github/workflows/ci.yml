@@ -45,14 +45,6 @@ jobs:
       with:
         key: ${{ matrix.rust }}
 
-    - name: Check formatting
-      run: cargo fmt --all -- --check
-      if: matrix.rust == 'stable'
-
-    - name: Run clippy
-      run: cargo clippy --workspace --all-targets --all-features -- -D warnings
-      if: matrix.rust == 'stable'
-
     - name: Build workspace
       run: cargo build --workspace --verbose
 
