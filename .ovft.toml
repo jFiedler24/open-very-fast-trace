@@ -1,0 +1,60 @@
+# Open Very Fast Trace Configuration File
+# This file configures the requirements traceability analysis
+
+# Directories containing source code files to scan for tags
+source_dirs = ["src", "ovft-core/src", "cargo-ovft/src"]
+
+# Directories containing specification files (markdown)
+spec_dirs = ["docs", "docs/requirements"]
+
+# File patterns to include when scanning source directories
+source_patterns = [
+    "*.rs",          # Rust files
+    "*.adl",         # Architecture Description Language files
+    "*.atl",         # Architecture Template Language files
+    "*.java",        # Java files
+    "*.c",           # C files
+    "*.cpp",         # C++ files
+    "*.h",           # Header files
+    "*.hpp",         # C++ header files
+    "*.py",          # Python files
+    "*.js",          # JavaScript files
+    "*.ts",          # TypeScript files
+    "*.go",          # Go files
+    "*.rb",          # Ruby files
+    "*.php",         # PHP files
+    "*.sh",          # Shell scripts
+    "*.sql",         # SQL files
+]
+
+# File patterns to exclude when scanning
+exclude_patterns = [
+    "target/**",
+    "node_modules/**",
+    ".git/**",
+    "*.tmp",
+    "*.bak",
+    "*.log",
+    "build/**",
+    "dist/**",
+]
+
+# Additional artifact types to recognize in tags
+artifact_types = [
+    "feat",      # Features
+    "req",       # Requirements
+    "arch",      # Architecture
+    "dsn",       # Design
+    "impl",      # Implementation
+    "utest",     # Unit tests
+    "itest",     # Integration tests
+    "stest",     # System tests
+    "uman",      # User manual
+    "oman",      # Operations manual
+]
+
+# Whether to generate detailed reports
+verbose = false
+
+# Output directory for reports
+output_dir = "target"

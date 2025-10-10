@@ -7,18 +7,14 @@ fn main() {
     let args: Vec<String> = env::args().collect();
 
     if args.len() < 2 {
-        println!("Usage: {} [OPTIONS]", args[0]);
-        println!("Options:");
-        println!("  --source-dirs <dirs>   Source directories to scan (comma separated)");
-        println!("  --spec-dirs <dirs>     Specification directories to scan (comma separated)");
-        println!("  --output <file>        Output HTML file path");
-        println!("  --help                 Show this help message");
+        print_usage(&args[0]);
         process::exit(1);
     }
 
     let mut source_dirs = Vec::new();
     let mut spec_dirs = Vec::new();
     let mut output_path = PathBuf::from("requirements_report.html");
+    let mut config_file = None;
 
     let mut i = 1;
     while i < args.len() {
@@ -50,18 +46,17 @@ fn main() {
                     process::exit(1);
                 }
             }
+            "--config" => {
+                if i + 1 < args.len() {
+                    config_file = Some(PathBuf::from(&args[i + 1]));
+                    i += 2;
+                } else {
+                    eprintln!("Error: --config requires a value");
+                    process::exit(1);
+                }
+            }
             "--help" => {
-                println!("Open Very Fast Trace - Requirements Tracing Tool");
-                println!();
-                println!("Usage: {} [OPTIONS]", args[0]);
-                println!();
-                println!("Options:");
-                println!("  --source-dirs <dirs>   Source directories to scan (comma separated)");
-                println!(
-                    "  --spec-dirs <dirs>     Specification directories to scan (comma separated)"
-                );
-                println!("  --output <file>        Output HTML file path (default: requirements_report.html)");
-                println!("  --help                 Show this help message");
+                print_help(&args[0]);
                 process::exit(0);
             }
             _ => {
@@ -71,15 +66,37 @@ fn main() {
         }
     }
 
-    // Build configuration
-    let mut config = Config::empty();
+    // Load configuration - either from specified file, auto-discover .ovft.toml, or use defaults
+    let mut config = if let Some(config_path) = config_file {
+        match Config::from_file(&config_path) {
+            Ok(config) => {
+                println!("Loaded configuration from: {}", config_path.display());
+                config
+            }
+            Err(e) => {
+                eprintln!("Error loading configuration from {}: {}", config_path.display(), e);
+                process::exit(1);
+            }
+        }
+    } else {
+        let loaded_config = Config::load_or_default();
+        if Config::load_from_current_dir().is_some() {
+            println!("Found and loaded .ovft.toml configuration");
+        }
+        loaded_config
+    };
 
-    for source_dir in source_dirs {
-        config = config.add_source_dir(source_dir);
+    // Override configuration with command line arguments
+    if !source_dirs.is_empty() {
+        config.source_dirs = source_dirs;
     }
-
-    for spec_dir in spec_dirs {
-        config = config.add_spec_dir(spec_dir);
+    
+    if !spec_dirs.is_empty() {
+        config.spec_dirs = spec_dirs;
+    }
+    
+    if let Some(output_parent) = output_path.parent() {
+        config.output_dir = Some(output_parent.to_path_buf());
     }
 
     // Create tracer and run analysis
@@ -118,4 +135,32 @@ fn main() {
     if trace_result.defect_count > 0 {
         process::exit(1); // Exit with error code if defects found
     }
+}
+
+fn print_usage(program_name: &str) {
+    println!("Usage: {} [OPTIONS]", program_name);
+    println!("Options:");
+    println!("  --source-dirs <dirs>   Source directories to scan (comma separated)");
+    println!("  --spec-dirs <dirs>     Specification directories to scan (comma separated)");
+    println!("  --output <file>        Output HTML file path");
+    println!("  --config <file>        Path to configuration file (.ovft.toml)");
+    println!("  --help                 Show this help message");
+}
+
+fn print_help(program_name: &str) {
+    println!("Open Very Fast Trace - Requirements Tracing Tool");
+    println!();
+    println!("Usage: {} [OPTIONS]", program_name);
+    println!();
+    println!("Options:");
+    println!("  --source-dirs <dirs>   Source directories to scan (comma separated)");
+    println!("  --spec-dirs <dirs>     Specification directories to scan (comma separated)");
+    println!("  --output <file>        Output HTML file path (default: requirements_report.html)");
+    println!("  --config <file>        Path to configuration file (.ovft.toml)");
+    println!("                         If not specified, looks for .ovft.toml in current or parent directories");
+    println!("  --help                 Show this help message");
+    println!();
+    println!("Configuration File:");
+    println!("  Create a .ovft.toml file to configure file extensions, source directories,");
+    println!("  and requirements directories. Command line options override configuration file settings.");
 }

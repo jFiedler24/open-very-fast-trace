@@ -107,9 +107,10 @@ impl Tracer {
         // Collect defective items
         for item in linked_items {
             if item.is_defect {
+                let detailed_description = self.generate_detailed_defect_description(&item);
                 defects.push(Defect {
                     defect_type: crate::core::DefectType::UncoveredItem,
-                    description: format!("Item {} has defects", item.item.id),
+                    description: detailed_description,
                     item_id: Some(item.item.id.clone()),
                 });
             }
@@ -125,6 +126,72 @@ impl Tracer {
             coverage_summary,
             is_success,
         }
+    }
+
+    /// Generate a detailed description of what's wrong with a defective item
+    fn generate_detailed_defect_description(&self, item: &LinkedSpecificationItem) -> String {
+        let mut issues = Vec::new();
+
+        // Check for broken outgoing links
+        for link in &item.outgoing_links {
+            match link.status {
+                crate::core::LinkStatus::Orphaned => {
+                    issues.push(format!("covers non-existing item {}", link.target_id));
+                }
+                crate::core::LinkStatus::Duplicate => {
+                    issues.push(format!("has duplicate ID {}", item.item.id));
+                }
+                crate::core::LinkStatus::Outdated => {
+                    issues.push(format!("covers outdated revision of {}", link.target_id));
+                }
+                crate::core::LinkStatus::Predated => {
+                    issues.push(format!("covers newer revision of {}", link.target_id));
+                }
+                crate::core::LinkStatus::Ambiguous => {
+                    issues.push(format!("has ambiguous reference to {}", link.target_id));
+                }
+                _ => {}
+            }
+        }
+
+        // Check for missing coverage
+        if !matches!(item.coverage_status, CoverageStatus::Covered) {
+            let missing_coverage = self.find_missing_coverage_types(item);
+            if !missing_coverage.is_empty() {
+                let coverage_list = missing_coverage.join(", ");
+                issues.push(format!("needs coverage by {}", coverage_list));
+            }
+        }
+
+        if issues.is_empty() {
+            format!("Item {} has unspecified defects", item.item.id)
+        } else if issues.len() == 1 {
+            format!("Item {} {}", item.item.id, issues[0])
+        } else {
+            format!("Item {} has multiple issues: {}", item.item.id, issues.join("; "))
+        }
+    }
+
+    /// Find which artifact types are missing coverage for an item
+    fn find_missing_coverage_types(&self, item: &LinkedSpecificationItem) -> Vec<String> {
+        let mut missing = Vec::new();
+        
+        for needed_type in &item.item.needs {
+            // Check if this artifact type has any incoming coverage
+            let has_coverage = item.incoming_links.iter().any(|link| {
+                if let Some(source_id) = &link.source_id {
+                    source_id.artifact_type == *needed_type
+                } else {
+                    false
+                }
+            });
+            
+            if !has_coverage {
+                missing.push(needed_type.clone());
+            }
+        }
+        
+        missing
     }
 }
 

@@ -1,0 +1,1595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Requirements Tracing Report</title>
+    <style>/* Requirements Tracing Report CSS */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+    line-height: 1.6;
+    color: #333;
+    background-color: #f8f9fa;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* Header */
+.report-header {
+    background: white;
+    border-radius: 8px;
+    padding: 30px;
+    margin-bottom: 30px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.report-header h1 {
+    color: #2c3e50;
+    font-size: 2.5rem;
+    margin: 0;
+}
+
+.status-badge {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 20px;
+    border-radius: 25px;
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+.status-badge.success {
+    background-color: #d4edda;
+    color: #155724;
+    border: 2px solid #c3e6cb;
+}
+
+.status-badge.error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 2px solid #f5c6cb;
+}
+
+.status-indicator {
+    font-size: 1.3rem;
+    font-weight: bold;
+}
+
+/* Summary Section */
+.summary {
+    background: white;
+    border-radius: 8px;
+    padding: 25px;
+    margin-bottom: 30px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.summary h2 {
+    color: #2c3e50;
+    margin-bottom: 20px;
+    font-size: 1.8rem;
+}
+
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+}
+
+.summary-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    border-left: 4px solid #007bff;
+}
+
+.summary-label {
+    font-weight: 600;
+    color: #495057;
+}
+
+.summary-value {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #007bff;
+}
+
+.summary-value.error {
+    color: #dc3545;
+}
+
+/* Defects Section */
+.defects {
+    background: white;
+    border-radius: 8px;
+    padding: 25px;
+    margin-bottom: 30px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    border-left: 4px solid #dc3545;
+}
+
+.defects h2 {
+    color: #dc3545;
+    margin-bottom: 20px;
+    font-size: 1.8rem;
+}
+
+.defect-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.defect-item {
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+    border-radius: 6px;
+    padding: 15px;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 15px;
+    align-items: center;
+}
+
+.defect-type {
+    background-color: #dc3545;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.defect-description {
+    color: #721c24;
+    font-weight: 500;
+}
+
+.defect-item-id {
+    font-family: monospace;
+    background-color: #f8f9fa;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    color: #495057;
+}
+
+/* Coverage Table */
+.coverage-by-type {
+    background: white;
+    border-radius: 8px;
+    padding: 25px;
+    margin-bottom: 30px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.coverage-by-type h2 {
+    color: #2c3e50;
+    margin-bottom: 20px;
+    font-size: 1.8rem;
+}
+
+.coverage-table table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+}
+
+.coverage-table th,
+.coverage-table td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.coverage-table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    color: #495057;
+    text-transform: uppercase;
+    font-size: 0.9rem;
+    letter-spacing: 0.5px;
+}
+
+.coverage-table tr:hover {
+    background-color: #f8f9fa;
+}
+
+.artifact-type {
+    font-family: monospace;
+    font-weight: 600;
+    color: #007bff;
+    text-transform: uppercase;
+}
+
+.total-count,
+.covered-count {
+    font-weight: 600;
+    text-align: center;
+}
+
+.coverage-percentage {
+    font-weight: 600;
+    text-align: center;
+}
+
+/* Specification Items */
+.specification-items {
+    background: white;
+    border-radius: 8px;
+    padding: 25px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.specification-items h2 {
+    color: #2c3e50;
+    margin-bottom: 30px;
+    font-size: 1.8rem;
+}
+
+.artifact-group {
+    margin-bottom: 40px;
+}
+
+.artifact-type-header {
+    color: #495057;
+    font-size: 1.5rem;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #dee2e6;
+    font-family: monospace;
+    letter-spacing: 1px;
+}
+
+.items-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    gap: 20px;
+}
+
+.spec-item {
+    background-color: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 20px;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.spec-item:hover {
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+.spec-item.defect {
+    border-left: 4px solid #dc3545;
+    background-color: #fff5f5;
+}
+
+.item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.item-id {
+    font-family: monospace;
+    font-size: 1.1rem;
+    color: #007bff;
+    margin: 0;
+    font-weight: 600;
+}
+
+.item-status {
+    display: flex;
+    gap: 8px;
+}
+
+.coverage-badge {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.coverage-badge.coverage-ok {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.coverage-badge.coverage-partial {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+.coverage-badge.coverage-error {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.item-content {
+    margin-bottom: 15px;
+}
+
+.item-title {
+    color: #2c3e50;
+    margin-bottom: 10px;
+    font-size: 1.1rem;
+}
+
+.item-description {
+    color: #6c757d;
+    line-height: 1.5;
+    margin-bottom: 15px;
+}
+
+.item-description p {
+    margin-bottom: 8px;
+}
+
+.item-metadata {
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    padding: 12px;
+    font-size: 0.9rem;
+}
+
+.metadata-row {
+    display: flex;
+    margin-bottom: 6px;
+}
+
+.metadata-row:last-child {
+    margin-bottom: 0;
+}
+
+.metadata-label {
+    font-weight: 600;
+    color: #495057;
+    min-width: 80px;
+    margin-right: 10px;
+}
+
+.metadata-value {
+    color: #6c757d;
+    font-family: monospace;
+    word-break: break-all;
+}
+
+/* Links Section */
+.links-section {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid #dee2e6;
+}
+
+.links-section h6 {
+    color: #495057;
+    margin-bottom: 10px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.links-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.link-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    margin-bottom: 6px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+.link-item:last-child {
+    margin-bottom: 0;
+}
+
+.link-item.link-ok {
+    background-color: #d4edda;
+    border-left: 3px solid #28a745;
+}
+
+.link-item.link-error {
+    background-color: #f8d7da;
+    border-left: 3px solid #dc3545;
+}
+
+.link-target,
+.link-source {
+    font-family: monospace;
+    font-weight: 600;
+    color: #007bff;
+}
+
+.link-status {
+    font-weight: 600;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.link-item.link-ok .link-status {
+    color: #155724;
+}
+
+.link-item.link-error .link-status {
+    color: #721c24;
+}
+
+/* Status Indicators */
+.status-indicator.coverage-ok,
+.status-indicator.link-ok {
+    color: #28a745;
+}
+
+.status-indicator.coverage-partial {
+    color: #ffc107;
+}
+
+.status-indicator.coverage-error,
+.status-indicator.link-error {
+    color: #dc3545;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .container {
+        padding: 15px;
+    }
+    
+    .report-header {
+        flex-direction: column;
+        gap: 20px;
+        text-align: center;
+    }
+    
+    .report-header h1 {
+        font-size: 2rem;
+    }
+    
+    .summary-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .items-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .coverage-table {
+        overflow-x: auto;
+    }
+    
+    .defect-item {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+}
+
+@media (max-width: 480px) {
+    .report-header h1 {
+        font-size: 1.8rem;
+    }
+    
+    .status-badge {
+        font-size: 1rem;
+        padding: 10px 15px;
+    }
+    
+    .item-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+}
+
+/* Requirement links styles */
+.requirement-link {
+    color: #3498db;
+    text-decoration: none;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 0.9em;
+    padding: 2px 6px;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    display: inline-block;
+    margin: 1px;
+}
+
+.requirement-link:hover {
+    color: #2980b9;
+    background-color: #e3f2fd;
+    border-color: #3498db;
+    text-decoration: none;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(52, 152, 219, 0.2);
+}
+
+.requirement-link:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(52, 152, 219, 0.2);
+}
+
+/* Different link statuses */
+.requirement-link.link-valid {
+    border-color: #27ae60;
+    background-color: #f8fff8;
+}
+
+.requirement-link.link-valid:hover {
+    background-color: #e8f5e8;
+    border-color: #27ae60;
+    color: #27ae60;
+}
+
+.requirement-link.link-invalid {
+    border-color: #e74c3c;
+    background-color: #fff8f8;
+}
+
+.requirement-link.link-invalid:hover {
+    background-color: #fdf2f2;
+    border-color: #e74c3c;
+    color: #e74c3c;
+}
+
+.requirement-link.link-orphaned {
+    border-color: #f39c12;
+    background-color: #fffbf0;
+}
+
+.requirement-link.link-orphaned:hover {
+    background-color: #fef5e7;
+    border-color: #f39c12;
+    color: #e67e22;
+}
+
+/* Target highlighting when navigating to an anchor */
+.spec-item:target {
+    border: 2px solid #3498db;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+    animation: highlight-pulse 2s ease-out;
+}
+
+@keyframes highlight-pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(52, 152, 219, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(52, 152, 219, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(52, 152, 219, 0);
+    }
+}
+
+/* Smooth scrolling for anchor links */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Metadata row spacing for links */
+.metadata-row .metadata-value .requirement-link:not(:last-child) {
+    margin-right: 4px;
+}
+</style>
+</head>
+<body>
+    <div class="container">
+        <header class="report-header">
+            <h1>Requirements Tracing Report</h1>
+            <div class="status-badge">
+                <span class="status-indicator">✗</span>
+                <span class="status-text">Issues found in requirements tracing</span>
+            </div>
+        </header>
+
+        <section class="summary">
+            <h2>Summary</h2>
+            <div class="summary-grid">
+                <div class="summary-item">
+                    <span class="summary-label">Total Items:</span>
+                    <span class="summary-value">36</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Defects:</span>
+                    <span class="summary-value">15</span>
+                </div>
+            </div>
+        </section><section class="defects">
+            <h2>Defects Found</h2>
+            <div class="defect-list"><div class="defect-item">
+                    <span class="defect-type">uncovered</span>
+                    <span class="defect-description">Item impl~validate-authentication-request-10238355544376201145~0 has defects</span>
+                </div><div class="defect-item">
+                    <span class="defect-type">uncovered</span>
+                    <span class="defect-description">Item impl~name-17302871119562254871~0 has defects</span>
+                </div><div class="defect-item">
+                    <span class="defect-type">uncovered</span>
+                    <span class="defect-description">Item impl~validate-authentication-request-17722622224547711304~0 has defects</span>
+                </div><div class="defect-item">
+                    <span class="defect-type">uncovered</span>
+                    <span class="defect-description">Item impl~name-854333303050403108~0 has defects</span>
+                </div><div class="defect-item">
+                    <span class="defect-type">uncovered</span>
+                    <span class="defect-description">Item impl~validate-authentication-request-15536764648801921626~0 has defects</span>
+                </div><div class="defect-item">
+                    <span class="defect-type">uncovered</span>
+                    <span class="defect-description">Item dsn~login-3900778673304214712~0 has defects</span>
+                </div><div class="defect-item">
+                    <span class="defect-type">uncovered</span>
+                    <span class="defect-description">Item impl~login-7467026895827611202~0 has defects</span>
+                </div><div class="defect-item">
+                    <span class="defect-type">uncovered</span>
+                    <span class="defect-description">Item impl~authenticate-user-17469626951383754446~0 has defects</span>
+                </div><div class="defect-item">
+                    <span class="defect-type">uncovered</span>
+                    <span class="defect-description">Item utest~authenticate-user-183861711306410629~0 has defects</span>
+                </div><div class="defect-item">
+                    <span class="defect-type">uncovered</span>
+                    <span class="defect-description">Item feat~tag-parsing~1 has defects</span>
+                </div><div class="defect-item">
+                    <span class="defect-type">uncovered</span>
+                    <span class="defect-description">Item feat~markdown-parsing~1 has defects</span>
+                </div><div class="defect-item">
+                    <span class="defect-type">uncovered</span>
+                    <span class="defect-description">Item feat~requirement-linking~1 has defects</span>
+                </div><div class="defect-item">
+                    <span class="defect-type">uncovered</span>
+                    <span class="defect-description">Item feat~html-reporting~1 has defects</span>
+                </div><div class="defect-item">
+                    <span class="defect-type">uncovered</span>
+                    <span class="defect-description">Item feat~build-integration~1 has defects</span>
+                </div><div class="defect-item">
+                    <span class="defect-type">uncovered</span>
+                    <span class="defect-description">Item feat~error-handling~1 has defects</span>
+                </div></div>
+        </section><section class="specification-items">
+            <h2>Specification Items</h2>
+            <div class="items-grid"><div class="spec-item" id="req-0">
+                    <div class="item-header">
+                        <h4 class="item-id">impl~linker-module-5128244155287616564~0</h4>
+                        <div class="item-status">
+                            <span class="coverage-badge">covered</span>
+                        </div>
+                    </div>
+                    
+                    <div class="item-content"></div>
+
+                    <div class="item-metadata"><div class="metadata-row">
+                                    <span class="metadata-label">Location:</span>
+                                    <span class="metadata-value">ovft-core/src/core/linker.rs:8</span>
+                                </div><div class="metadata-row">
+                            <span class="metadata-label">Covers:</span>
+                            <span class="metadata-value"><span class="requirement-link">dsn~linker-module~1</span></span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Outgoing Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-covers">dsn~linker-module~1</span></span>
+                        </div></div>
+                </div><div class="spec-item" id="req-1">
+                    <div class="item-header">
+                        <h4 class="item-id">impl~core-data-models-4496138226165708051~0</h4>
+                        <div class="item-status">
+                            <span class="coverage-badge">covered</span>
+                        </div>
+                    </div>
+                    
+                    <div class="item-content"></div>
+
+                    <div class="item-metadata"><div class="metadata-row">
+                                    <span class="metadata-label">Location:</span>
+                                    <span class="metadata-value">ovft-core/src/core/model.rs:6</span>
+                                </div><div class="metadata-row">
+                            <span class="metadata-label">Covers:</span>
+                            <span class="metadata-value"><span class="requirement-link">dsn~core-data-models~1</span></span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Outgoing Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-covers">dsn~core-data-models~1</span></span>
+                        </div></div>
+                </div><div class="spec-item" id="req-2">
+                    <div class="item-header">
+                        <h4 class="item-id">impl~markdown-importer-module-7213890917879537369~0</h4>
+                        <div class="item-status">
+                            <span class="coverage-badge">covered</span>
+                        </div>
+                    </div>
+                    
+                    <div class="item-content"></div>
+
+                    <div class="item-metadata"><div class="metadata-row">
+                                    <span class="metadata-label">Location:</span>
+                                    <span class="metadata-value">ovft-core/src/importers/markdown_importer.rs:10</span>
+                                </div><div class="metadata-row">
+                            <span class="metadata-label">Covers:</span>
+                            <span class="metadata-value"><span class="requirement-link">dsn~markdown-importer-module~1</span></span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Outgoing Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-covers">dsn~markdown-importer-module~1</span></span>
+                        </div></div>
+                </div><div class="spec-item" id="req-3">
+                    <div class="item-header">
+                        <h4 class="item-id">impl~tag-importer-module-8616776215265433623~0</h4>
+                        <div class="item-status">
+                            <span class="coverage-badge">covered</span>
+                        </div>
+                    </div>
+                    
+                    <div class="item-content"></div>
+
+                    <div class="item-metadata"><div class="metadata-row">
+                                    <span class="metadata-label">Location:</span>
+                                    <span class="metadata-value">ovft-core/src/importers/tag_importer.rs:11</span>
+                                </div><div class="metadata-row">
+                            <span class="metadata-label">Covers:</span>
+                            <span class="metadata-value"><span class="requirement-link">dsn~tag-importer-module~1</span></span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Outgoing Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-covers">dsn~tag-importer-module~1</span></span>
+                        </div></div>
+                </div><div class="spec-item" id="req-4">
+                    <div class="item-header">
+                        <h4 class="item-id">impl~validate-authentication-request-10238355544376201145~0</h4>
+                        <div class="item-status">
+                            <span class="coverage-badge">covered</span>
+                        </div>
+                    </div>
+                    
+                    <div class="item-content"></div>
+
+                    <div class="item-metadata"><div class="metadata-row">
+                                    <span class="metadata-label">Location:</span>
+                                    <span class="metadata-value">ovft-core/src/importers/tag_importer.rs:13</span>
+                                </div><div class="metadata-row">
+                            <span class="metadata-label">Covers:</span>
+                            <span class="metadata-value"><span class="requirement-link">dsn~validate-authentication-request~1</span></span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Outgoing Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-orphaned">dsn~validate-authentication-request~1</span></span>
+                        </div></div>
+                </div><div class="spec-item" id="req-5">
+                    <div class="item-header">
+                        <h4 class="item-id">impl~name-17302871119562254871~0</h4>
+                        <div class="item-status">
+                            <span class="coverage-badge">covered</span>
+                        </div>
+                    </div>
+                    
+                    <div class="item-content"></div>
+
+                    <div class="item-metadata"><div class="metadata-row">
+                                    <span class="metadata-label">Location:</span>
+                                    <span class="metadata-value">ovft-core/src/importers/tag_importer.rs:15</span>
+                                </div><div class="metadata-row">
+                            <span class="metadata-label">Covers:</span>
+                            <span class="metadata-value"><span class="requirement-link">req~name~1</span></span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Outgoing Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-orphaned">req~name~1</span></span>
+                        </div></div>
+                </div><div class="spec-item" id="req-6">
+                    <div class="item-header">
+                        <h4 class="item-id">impl~validate-authentication-request-17722622224547711304~0</h4>
+                        <div class="item-status">
+                            <span class="coverage-badge">covered</span>
+                        </div>
+                    </div>
+                    
+                    <div class="item-content"></div>
+
+                    <div class="item-metadata"><div class="metadata-row">
+                                    <span class="metadata-label">Location:</span>
+                                    <span class="metadata-value">ovft-core/src/importers/tag_importer.rs:95</span>
+                                </div><div class="metadata-row">
+                            <span class="metadata-label">Covers:</span>
+                            <span class="metadata-value"><span class="requirement-link">dsn~validate-authentication-request~1</span></span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Outgoing Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-orphaned">dsn~validate-authentication-request~1</span></span>
+                        </div></div>
+                </div><div class="spec-item" id="req-7">
+                    <div class="item-header">
+                        <h4 class="item-id">impl~name-854333303050403108~0</h4>
+                        <div class="item-status">
+                            <span class="coverage-badge">covered</span>
+                        </div>
+                    </div>
+                    
+                    <div class="item-content"></div>
+
+                    <div class="item-metadata"><div class="metadata-row">
+                                    <span class="metadata-label">Location:</span>
+                                    <span class="metadata-value">ovft-core/src/importers/tag_importer.rs:158</span>
+                                </div><div class="metadata-row">
+                            <span class="metadata-label">Covers:</span>
+                            <span class="metadata-value"><span class="requirement-link">req~name~1</span></span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Outgoing Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-orphaned">req~name~1</span></span>
+                        </div></div>
+                </div><div class="spec-item" id="req-8">
+                    <div class="item-header">
+                        <h4 class="item-id">impl~validate-authentication-request-15536764648801921626~0</h4>
+                        <div class="item-status">
+                            <span class="coverage-badge">covered</span>
+                        </div>
+                    </div>
+                    
+                    <div class="item-content"></div>
+
+                    <div class="item-metadata"><div class="metadata-row">
+                                    <span class="metadata-label">Location:</span>
+                                    <span class="metadata-value">ovft-core/src/importers/tag_importer.rs:244</span>
+                                </div><div class="metadata-row">
+                            <span class="metadata-label">Covers:</span>
+                            <span class="metadata-value"><span class="requirement-link">dsn~validate-authentication-request~1</span></span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Outgoing Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-orphaned">dsn~validate-authentication-request~1</span></span>
+                        </div></div>
+                </div><div class="spec-item" id="req-9">
+                    <div class="item-header">
+                        <h4 class="item-id">dsn~login-3900778673304214712~0</h4>
+                        <div class="item-status">
+                            <span class="coverage-badge">uncovered</span>
+                        </div>
+                    </div>
+                    
+                    <div class="item-content"></div>
+
+                    <div class="item-metadata"><div class="metadata-row">
+                                    <span class="metadata-label">Location:</span>
+                                    <span class="metadata-value">ovft-core/src/importers/tag_importer.rs:261</span>
+                                </div><div class="metadata-row">
+                            <span class="metadata-label">Needs:</span>
+                            <span class="metadata-value">impl, test</span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Covers:</span>
+                            <span class="metadata-value"><span class="requirement-link">feat~login~1</span></span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Outgoing Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-orphaned">feat~login~1</span></span>
+                        </div></div>
+                </div><div class="spec-item" id="req-10">
+                    <div class="item-header">
+                        <h4 class="item-id">impl~login-7467026895827611202~0</h4>
+                        <div class="item-status">
+                            <span class="coverage-badge">covered</span>
+                        </div>
+                    </div>
+                    
+                    <div class="item-content"></div>
+
+                    <div class="item-metadata"><div class="metadata-row">
+                                    <span class="metadata-label">Location:</span>
+                                    <span class="metadata-value">ovft-core/src/importers/tag_importer.rs:275</span>
+                                </div><div class="metadata-row">
+                            <span class="metadata-label">Covers:</span>
+                            <span class="metadata-value"><span class="requirement-link">req~login~1</span></span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Outgoing Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-orphaned">req~login~1</span></span>
+                        </div></div>
+                </div><div class="spec-item" id="req-11">
+                    <div class="item-header">
+                        <h4 class="item-id">impl~authenticate-user-17469626951383754446~0</h4>
+                        <div class="item-status">
+                            <span class="coverage-badge">covered</span>
+                        </div>
+                    </div>
+                    
+                    <div class="item-content"></div>
+
+                    <div class="item-metadata"><div class="metadata-row">
+                                    <span class="metadata-label">Location:</span>
+                                    <span class="metadata-value">ovft-core/src/importers/tag_importer.rs:292</span>
+                                </div><div class="metadata-row">
+                            <span class="metadata-label">Covers:</span>
+                            <span class="metadata-value"><span class="requirement-link">dsn~authenticate-user~1</span></span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Outgoing Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-orphaned">dsn~authenticate-user~1</span></span>
+                        </div></div>
+                </div><div class="spec-item" id="req-12">
+                    <div class="item-header">
+                        <h4 class="item-id">utest~authenticate-user-183861711306410629~0</h4>
+                        <div class="item-status">
+                            <span class="coverage-badge">covered</span>
+                        </div>
+                    </div>
+                    
+                    <div class="item-content"></div>
+
+                    <div class="item-metadata"><div class="metadata-row">
+                                    <span class="metadata-label">Location:</span>
+                                    <span class="metadata-value">ovft-core/src/importers/tag_importer.rs:294</span>
+                                </div><div class="metadata-row">
+                            <span class="metadata-label">Covers:</span>
+                            <span class="metadata-value"><span class="requirement-link">dsn~authenticate-user~1</span></span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Outgoing Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-orphaned">dsn~authenticate-user~1</span></span>
+                        </div></div>
+                </div><div class="spec-item" id="req-13">
+                    <div class="item-header">
+                        <h4 class="item-id">impl~error-types-14845299094946806561~0</h4>
+                        <div class="item-status">
+                            <span class="coverage-badge">covered</span>
+                        </div>
+                    </div>
+                    
+                    <div class="item-content"></div>
+
+                    <div class="item-metadata"><div class="metadata-row">
+                                    <span class="metadata-label">Location:</span>
+                                    <span class="metadata-value">ovft-core/src/error.rs:4</span>
+                                </div><div class="metadata-row">
+                            <span class="metadata-label">Covers:</span>
+                            <span class="metadata-value"><span class="requirement-link">dsn~error-types~1</span></span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Outgoing Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-covers">dsn~error-types~1</span></span>
+                        </div></div>
+                </div><div class="spec-item" id="req-14">
+                    <div class="item-header">
+                        <h4 class="item-id">impl~configuration-system-5087074149644648145~0</h4>
+                        <div class="item-status">
+                            <span class="coverage-badge">covered</span>
+                        </div>
+                    </div>
+                    
+                    <div class="item-content"></div>
+
+                    <div class="item-metadata"><div class="metadata-row">
+                                    <span class="metadata-label">Location:</span>
+                                    <span class="metadata-value">ovft-core/src/config.rs:5</span>
+                                </div><div class="metadata-row">
+                            <span class="metadata-label">Covers:</span>
+                            <span class="metadata-value"><span class="requirement-link">dsn~configuration-system~1</span></span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Outgoing Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-covers">dsn~configuration-system~1</span></span>
+                        </div></div>
+                </div><div class="spec-item" id="req-15">
+                    <div class="item-header">
+                        <h4 class="item-id">impl~html-reporter-module-15707191825041769501~0</h4>
+                        <div class="item-status">
+                            <span class="coverage-badge">covered</span>
+                        </div>
+                    </div>
+                    
+                    <div class="item-content"></div>
+
+                    <div class="item-metadata"><div class="metadata-row">
+                                    <span class="metadata-label">Location:</span>
+                                    <span class="metadata-value">ovft-core/src/reporters/html_reporter.rs:10</span>
+                                </div><div class="metadata-row">
+                            <span class="metadata-label">Covers:</span>
+                            <span class="metadata-value"><span class="requirement-link">dsn~html-reporter-module~1</span></span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Outgoing Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-covers">dsn~html-reporter-module~1</span></span>
+                        </div></div>
+                </div><div class="spec-item" id="req-16">
+                    <div class="item-header">
+                        <h4 class="item-id">req~tag-regex-parsing~1</h4>
+                        <div class="item-status">
+                            <span class="coverage-badge">covered</span>
+                        </div>
+                    </div>
+                    
+                    <div class="item-content"><h5 class="item-title">req~tag-regex-parsing~1</h5><div class="item-description">**Title:** Parse requirement tags using regex patterns
+**Description:** The system shall use regex patterns to identify and parse requirement tags in source code files, supporting both full tags `[impl-&gt;dsn~validate-request~1]` and short tags `[[req~login~1:impl]]`.
+**Rationale:** Regex parsing provides efficient and flexible tag recognition across different file formats.
+---</div></div>
+
+                    <div class="item-metadata"><div class="metadata-row">
+                                    <span class="metadata-label">Location:</span>
+                                    <span class="metadata-value">docs/requirements/requirements.md:5</span>
+                                </div><div class="metadata-row">
+                            <span class="metadata-label">Needs:</span>
+                            <span class="metadata-value">dsn</span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Covers:</span>
+                            <span class="metadata-value"><span class="requirement-link">feat~tag-parsing~1</span></span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Outgoing Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-covers">feat~tag-parsing~1</span></span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Incoming Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-covered shallow">dsn~tag-importer-module~1</span></span>
+                        </div></div>
+                </div><div class="spec-item" id="req-17">
+                    <div class="item-header">
+                        <h4 class="item-id">req~markdown-specification-parsing~1</h4>
+                        <div class="item-status">
+                            <span class="coverage-badge">covered</span>
+                        </div>
+                    </div>
+                    
+                    <div class="item-content"><h5 class="item-title">req~markdown-specification-parsing~1</h5><div class="item-description">**Title:** Parse OpenFastTrace-compatible markdown syntax
+**Description:** The system shall parse markdown files containing requirement specifications using OpenFastTrace syntax including headers like `# req~name~1`, and keywords like `Needs:`, `Covers:`, `Tags:`.
+**Rationale:** Compatibility with OpenFastTrace ensures existing requirement documents can be migrated without modification.
+---</div></div>
+
+                    <div class="item-metadata"><div class="metadata-row">
+                                    <span class="metadata-label">Location:</span>
+                                    <span class="metadata-value">docs/requirements/requirements.md:21</span>
+                                </div><div class="metadata-row">
+                            <span class="metadata-label">Needs:</span>
+                            <span class="metadata-value">dsn</span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Covers:</span>
+                            <span class="metadata-value"><span class="requirement-link">feat~markdown-parsing~1</span></span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Outgoing Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-covers">feat~markdown-parsing~1</span></span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Incoming Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-covered shallow">dsn~markdown-importer-module~1</span></span>
+                        </div></div>
+                </div><div class="spec-item" id="req-18">
+                    <div class="item-header">
+                        <h4 class="item-id">req~coverage-analysis~1</h4>
+                        <div class="item-status">
+                            <span class="coverage-badge">covered</span>
+                        </div>
+                    </div>
+                    
+                    <div class="item-content"><h5 class="item-title">req~coverage-analysis~1</h5><div class="item-description">**Title:** Analyze requirement coverage and detect defects
+**Description:** The system shall analyze the relationship between requirements and their implementations to determine coverage status and identify defects such as orphaned coverage, uncovered requirements, and circular dependencies.
+**Rationale:** Automated coverage analysis ensures all requirements are properly implemented and tested.
+---</div></div>
+
+                    <div class="item-metadata"><div class="metadata-row">
+                                    <span class="metadata-label">Location:</span>
+                                    <span class="metadata-value">docs/requirements/requirements.md:37</span>
+                                </div><div class="metadata-row">
+                            <span class="metadata-label">Needs:</span>
+                            <span class="metadata-value">dsn</span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Covers:</span>
+                            <span class="metadata-value"><span class="requirement-link">feat~requirement-linking~1</span></span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Outgoing Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-covers">feat~requirement-linking~1</span></span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Incoming Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-covered shallow">dsn~linker-module~1</span>,<span class="requirement-link link-covered shallow">dsn~core-data-models~1</span></span>
+                        </div></div>
+                </div><div class="spec-item" id="req-19">
+                    <div class="item-header">
+                        <h4 class="item-id">req~html-template-rendering~1</h4>
+                        <div class="item-status">
+                            <span class="coverage-badge">covered</span>
+                        </div>
+                    </div>
+                    
+                    <div class="item-content"><h5 class="item-title">req~html-template-rendering~1</h5><div class="item-description">**Title:** Render HTML reports using templates
+**Description:** The system shall use template-based rendering to generate HTML reports that display requirement coverage, defects, and detailed traceability information.
+**Rationale:** Template-based rendering allows for consistent, professional-looking reports that can be easily customized.
+---</div></div>
+
+                    <div class="item-metadata"><div class="metadata-row">
+                                    <span class="metadata-label">Location:</span>
+                                    <span class="metadata-value">docs/requirements/requirements.md:53</span>
+                                </div><div class="metadata-row">
+                            <span class="metadata-label">Needs:</span>
+                            <span class="metadata-value">dsn</span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Covers:</span>
+                            <span class="metadata-value"><span class="requirement-link">feat~html-reporting~1</span></span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Outgoing Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-covers">feat~html-reporting~1</span></span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Incoming Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-covered shallow">dsn~html-reporter-module~1</span></span>
+                        </div></div>
+                </div><div class="spec-item" id="req-20">
+                    <div class="item-header">
+                        <h4 class="item-id">req~configuration-management~1</h4>
+                        <div class="item-status">
+                            <span class="coverage-badge">covered</span>
+                        </div>
+                    </div>
+                    
+                    <div class="item-content"><h5 class="item-title">req~configuration-management~1</h5><div class="item-description">**Title:** Manage configuration through files and code
+**Description:** The system shall support configuration through both TOML files and programmatic configuration to specify source directories, specification directories, and output settings.
+**Rationale:** Flexible configuration allows the tool to be adapted to different project structures and build processes.
+---</div></div>
+
+                    <div class="item-metadata"><div class="metadata-row">
+                                    <span class="metadata-label">Location:</span>
+                                    <span class="metadata-value">docs/requirements/requirements.md:69</span>
+                                </div><div class="metadata-row">
+                            <span class="metadata-label">Needs:</span>
+                            <span class="metadata-value">dsn</span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Covers:</span>
+                            <span class="metadata-value"><span class="requirement-link">feat~build-integration~1</span></span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Outgoing Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-covers">feat~build-integration~1</span></span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Incoming Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-covered shallow">dsn~configuration-system~1</span></span>
+                        </div></div>
+                </div><div class="spec-item" id="req-21">
+                    <div class="item-header">
+                        <h4 class="item-id">req~detailed-error-messages~1</h4>
+                        <div class="item-status">
+                            <span class="coverage-badge">covered</span>
+                        </div>
+                    </div>
+                    
+                    <div class="item-content"><h5 class="item-title">req~detailed-error-messages~1</h5><div class="item-description">**Title:** Provide detailed error messages with location information
+**Description:** The system shall provide detailed error messages that include file paths, line numbers, and specific descriptions of parsing or analysis failures.
+**Rationale:** Detailed error information helps developers quickly locate and fix issues in their requirements or code.
+---</div></div>
+
+                    <div class="item-metadata"><div class="metadata-row">
+                                    <span class="metadata-label">Location:</span>
+                                    <span class="metadata-value">docs/requirements/requirements.md:85</span>
+                                </div><div class="metadata-row">
+                            <span class="metadata-label">Needs:</span>
+                            <span class="metadata-value">dsn</span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Covers:</span>
+                            <span class="metadata-value"><span class="requirement-link">feat~error-handling~1</span></span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Outgoing Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-covers">feat~error-handling~1</span></span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Incoming Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-covered shallow">dsn~error-types~1</span></span>
+                        </div></div>
+                </div><div class="spec-item" id="req-22">
+                    <div class="item-header">
+                        <h4 class="item-id">req~file-format-support~1</h4>
+                        <div class="item-status">
+                            <span class="coverage-badge">covered</span>
+                        </div>
+                    </div>
+                    
+                    <div class="item-content"><h5 class="item-title">req~file-format-support~1</h5><div class="item-description">**Title:** Support multiple source file formats
+**Description:** The system shall support parsing requirement tags from Rust (.rs), ATL (.atl), and ADL (.adl) files using appropriate comment syntax for each format.
+**Rationale:** Supporting multiple file formats makes the tool useful across different types of projects and toolchains.</div></div>
+
+                    <div class="item-metadata"><div class="metadata-row">
+                                    <span class="metadata-label">Location:</span>
+                                    <span class="metadata-value">docs/requirements/requirements.md:101</span>
+                                </div><div class="metadata-row">
+                            <span class="metadata-label">Needs:</span>
+                            <span class="metadata-value">dsn</span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Covers:</span>
+                            <span class="metadata-value"><span class="requirement-link">feat~tag-parsing~1</span></span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Outgoing Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-covers">feat~tag-parsing~1</span></span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Incoming Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-covered shallow">dsn~tag-importer-module~1</span></span>
+                        </div></div>
+                </div><div class="spec-item" id="req-23">
+                    <div class="item-header">
+                        <h4 class="item-id">feat~tag-parsing~1</h4>
+                        <div class="item-status">
+                            <span class="coverage-badge">partial</span>
+                        </div>
+                    </div>
+                    
+                    <div class="item-content"><h5 class="item-title">feat~tag-parsing~1</h5><div class="item-description">**Title:** Parse requirement tags from source code files
+**Description:** The system shall be able to parse requirement tags from various source code file formats including Rust (.rs), ATL (.atl), and ADL (.adl) files.
+**Rationale:** This enables developers to embed traceability information directly in their source code, maintaining consistency between implementation and requirements.
+---</div></div>
+
+                    <div class="item-metadata"><div class="metadata-row">
+                                    <span class="metadata-label">Location:</span>
+                                    <span class="metadata-value">docs/requirements/features.md:5</span>
+                                </div><div class="metadata-row">
+                            <span class="metadata-label">Needs:</span>
+                            <span class="metadata-value">req, dsn</span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Incoming Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-covered shallow">req~tag-regex-parsing~1</span>,<span class="requirement-link link-covered shallow">req~file-format-support~1</span></span>
+                        </div></div>
+                </div><div class="spec-item" id="req-24">
+                    <div class="item-header">
+                        <h4 class="item-id">feat~markdown-parsing~1</h4>
+                        <div class="item-status">
+                            <span class="coverage-badge">partial</span>
+                        </div>
+                    </div>
+                    
+                    <div class="item-content"><h5 class="item-title">feat~markdown-parsing~1</h5><div class="item-description">**Title:** Parse requirements from markdown files
+**Description:** The system shall be able to parse requirement specifications from markdown files using OpenFastTrace-compatible syntax.
+**Rationale:** Markdown provides a human-readable format for documenting requirements that can be easily version-controlled and reviewed.
+---</div></div>
+
+                    <div class="item-metadata"><div class="metadata-row">
+                                    <span class="metadata-label">Location:</span>
+                                    <span class="metadata-value">docs/requirements/features.md:19</span>
+                                </div><div class="metadata-row">
+                            <span class="metadata-label">Needs:</span>
+                            <span class="metadata-value">req, dsn</span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Incoming Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-covered shallow">req~markdown-specification-parsing~1</span></span>
+                        </div></div>
+                </div><div class="spec-item" id="req-25">
+                    <div class="item-header">
+                        <h4 class="item-id">feat~requirement-linking~1</h4>
+                        <div class="item-status">
+                            <span class="coverage-badge">partial</span>
+                        </div>
+                    </div>
+                    
+                    <div class="item-content"><h5 class="item-title">feat~requirement-linking~1</h5><div class="item-description">**Title:** Link requirements to implementations and tests
+**Description:** The system shall be able to automatically link requirements to their implementations and tests by analyzing coverage relationships.
+**Rationale:** Automated linking ensures that all requirements are properly covered and helps identify orphaned or uncovered requirements.
+---</div></div>
+
+                    <div class="item-metadata"><div class="metadata-row">
+                                    <span class="metadata-label">Location:</span>
+                                    <span class="metadata-value">docs/requirements/features.md:33</span>
+                                </div><div class="metadata-row">
+                            <span class="metadata-label">Needs:</span>
+                            <span class="metadata-value">req, dsn</span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Incoming Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-covered shallow">req~coverage-analysis~1</span></span>
+                        </div></div>
+                </div><div class="spec-item" id="req-26">
+                    <div class="item-header">
+                        <h4 class="item-id">feat~html-reporting~1</h4>
+                        <div class="item-status">
+                            <span class="coverage-badge">partial</span>
+                        </div>
+                    </div>
+                    
+                    <div class="item-content"><h5 class="item-title">feat~html-reporting~1</h5><div class="item-description">**Title:** Generate HTML tracing reports
+**Description:** The system shall generate comprehensive HTML reports showing requirement coverage, defects, and traceability matrices.
+**Rationale:** HTML reports provide an accessible way to visualize and share requirements tracing results with stakeholders.
+---</div></div>
+
+                    <div class="item-metadata"><div class="metadata-row">
+                                    <span class="metadata-label">Location:</span>
+                                    <span class="metadata-value">docs/requirements/features.md:47</span>
+                                </div><div class="metadata-row">
+                            <span class="metadata-label">Needs:</span>
+                            <span class="metadata-value">req, dsn</span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Incoming Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-covered shallow">req~html-template-rendering~1</span></span>
+                        </div></div>
+                </div><div class="spec-item" id="req-27">
+                    <div class="item-header">
+                        <h4 class="item-id">feat~build-integration~1</h4>
+                        <div class="item-status">
+                            <span class="coverage-badge">partial</span>
+                        </div>
+                    </div>
+                    
+                    <div class="item-content"><h5 class="item-title">feat~build-integration~1</h5><div class="item-description">**Title:** Simple build.rs integration
+**Description:** The system shall provide a simple API that can be easily integrated into Rust build.rs files for automated requirements checking.
+**Rationale:** Build-time integration ensures that requirements tracing is part of the regular build process and prevents incomplete tracing from being committed.
+---</div></div>
+
+                    <div class="item-metadata"><div class="metadata-row">
+                                    <span class="metadata-label">Location:</span>
+                                    <span class="metadata-value">docs/requirements/features.md:61</span>
+                                </div><div class="metadata-row">
+                            <span class="metadata-label">Needs:</span>
+                            <span class="metadata-value">req, dsn</span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Incoming Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-covered shallow">req~configuration-management~1</span></span>
+                        </div></div>
+                </div><div class="spec-item" id="req-28">
+                    <div class="item-header">
+                        <h4 class="item-id">feat~error-handling~1</h4>
+                        <div class="item-status">
+                            <span class="coverage-badge">partial</span>
+                        </div>
+                    </div>
+                    
+                    <div class="item-content"><h5 class="item-title">feat~error-handling~1</h5><div class="item-description">**Title:** Comprehensive error handling and reporting
+**Description:** The system shall provide clear, actionable error messages when parsing fails or requirements tracing issues are detected.
+**Rationale:** Good error handling helps developers quickly identify and fix requirements tracing issues.</div></div>
+
+                    <div class="item-metadata"><div class="metadata-row">
+                                    <span class="metadata-label">Location:</span>
+                                    <span class="metadata-value">docs/requirements/features.md:75</span>
+                                </div><div class="metadata-row">
+                            <span class="metadata-label">Needs:</span>
+                            <span class="metadata-value">req, dsn</span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Incoming Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-covered shallow">req~detailed-error-messages~1</span></span>
+                        </div></div>
+                </div><div class="spec-item" id="req-29">
+                    <div class="item-header">
+                        <h4 class="item-id">dsn~tag-importer-module~1</h4>
+                        <div class="item-status">
+                            <span class="coverage-badge">covered</span>
+                        </div>
+                    </div>
+                    
+                    <div class="item-content"><h5 class="item-title">dsn~tag-importer-module~1</h5><div class="item-description">**Title:** Tag importer module with regex-based parsing
+**Description:** The system shall implement a TagImporter module that uses compiled regex patterns to efficiently parse requirement tags from source code files. The module shall support multiple tag formats and generate specification items with automatic naming.
+**Rationale:** A dedicated importer module provides clear separation of concerns and enables efficient tag parsing across multiple file formats.
+---</div></div>
+
+                    <div class="item-metadata"><div class="metadata-row">
+                                    <span class="metadata-label">Location:</span>
+                                    <span class="metadata-value">docs/requirements/design.md:5</span>
+                                </div><div class="metadata-row">
+                            <span class="metadata-label">Needs:</span>
+                            <span class="metadata-value">impl</span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Covers:</span>
+                            <span class="metadata-value"><span class="requirement-link">req~tag-regex-parsing~1</span>,<span class="requirement-link">req~file-format-support~1</span></span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Outgoing Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-covers">req~tag-regex-parsing~1</span>,<span class="requirement-link link-covers">req~file-format-support~1</span></span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Incoming Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-covered shallow">impl~tag-importer-module-8616776215265433623~0</span></span>
+                        </div></div>
+                </div><div class="spec-item" id="req-30">
+                    <div class="item-header">
+                        <h4 class="item-id">dsn~markdown-importer-module~1</h4>
+                        <div class="item-status">
+                            <span class="coverage-badge">covered</span>
+                        </div>
+                    </div>
+                    
+                    <div class="item-content"><h5 class="item-title">dsn~markdown-importer-module~1</h5><div class="item-description">**Title:** Markdown importer module with pulldown-cmark integration
+**Description:** The system shall implement a MarkdownImporter module that uses the pulldown-cmark library to parse markdown files and extract requirement specifications using OpenFastTrace-compatible syntax.
+**Rationale:** Using pulldown-cmark ensures robust markdown parsing while maintaining compatibility with existing requirement documents.
+---</div></div>
+
+                    <div class="item-metadata"><div class="metadata-row">
+                                    <span class="metadata-label">Location:</span>
+                                    <span class="metadata-value">docs/requirements/design.md:21</span>
+                                </div><div class="metadata-row">
+                            <span class="metadata-label">Needs:</span>
+                            <span class="metadata-value">impl</span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Covers:</span>
+                            <span class="metadata-value"><span class="requirement-link">req~markdown-specification-parsing~1</span></span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Outgoing Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-covers">req~markdown-specification-parsing~1</span></span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Incoming Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-covered shallow">impl~markdown-importer-module-7213890917879537369~0</span></span>
+                        </div></div>
+                </div><div class="spec-item" id="req-31">
+                    <div class="item-header">
+                        <h4 class="item-id">dsn~linker-module~1</h4>
+                        <div class="item-status">
+                            <span class="coverage-badge">covered</span>
+                        </div>
+                    </div>
+                    
+                    <div class="item-content"><h5 class="item-title">dsn~linker-module~1</h5><div class="item-description">**Title:** Linker module for coverage analysis
+**Description:** The system shall implement a Linker module that analyzes relationships between specification items, determines coverage status, identifies defects, and produces LinkedSpecificationItem objects with complete traceability information.
+**Rationale:** A specialized linker module encapsulates the complex logic needed for accurate coverage analysis and defect detection.
+---</div></div>
+
+                    <div class="item-metadata"><div class="metadata-row">
+                                    <span class="metadata-label">Location:</span>
+                                    <span class="metadata-value">docs/requirements/design.md:37</span>
+                                </div><div class="metadata-row">
+                            <span class="metadata-label">Needs:</span>
+                            <span class="metadata-value">impl</span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Covers:</span>
+                            <span class="metadata-value"><span class="requirement-link">req~coverage-analysis~1</span></span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Outgoing Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-covers">req~coverage-analysis~1</span></span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Incoming Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-covered shallow">impl~linker-module-5128244155287616564~0</span></span>
+                        </div></div>
+                </div><div class="spec-item" id="req-32">
+                    <div class="item-header">
+                        <h4 class="item-id">dsn~html-reporter-module~1</h4>
+                        <div class="item-status">
+                            <span class="coverage-badge">covered</span>
+                        </div>
+                    </div>
+                    
+                    <div class="item-content"><h5 class="item-title">dsn~html-reporter-module~1</h5><div class="item-description">**Title:** HTML reporter module with askama templates
+**Description:** The system shall implement an HtmlReporter module that uses askama templates to generate professional HTML reports showing requirement coverage, defects, and detailed item information.
+**Rationale:** Template-based rendering provides flexibility and maintainability while ensuring consistent report formatting.
+---</div></div>
+
+                    <div class="item-metadata"><div class="metadata-row">
+                                    <span class="metadata-label">Location:</span>
+                                    <span class="metadata-value">docs/requirements/design.md:53</span>
+                                </div><div class="metadata-row">
+                            <span class="metadata-label">Needs:</span>
+                            <span class="metadata-value">impl</span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Covers:</span>
+                            <span class="metadata-value"><span class="requirement-link">req~html-template-rendering~1</span></span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Outgoing Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-covers">req~html-template-rendering~1</span></span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Incoming Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-covered shallow">impl~html-reporter-module-15707191825041769501~0</span></span>
+                        </div></div>
+                </div><div class="spec-item" id="req-33">
+                    <div class="item-header">
+                        <h4 class="item-id">dsn~configuration-system~1</h4>
+                        <div class="item-status">
+                            <span class="coverage-badge">covered</span>
+                        </div>
+                    </div>
+                    
+                    <div class="item-content"><h5 class="item-title">dsn~configuration-system~1</h5><div class="item-description">**Title:** Configuration system with TOML support
+**Description:** The system shall implement a Config struct with builder pattern support, TOML file serialization/deserialization, and programmatic configuration methods for maximum flexibility.
+**Rationale:** A comprehensive configuration system enables easy integration into different build environments and project structures.
+---</div></div>
+
+                    <div class="item-metadata"><div class="metadata-row">
+                                    <span class="metadata-label">Location:</span>
+                                    <span class="metadata-value">docs/requirements/design.md:69</span>
+                                </div><div class="metadata-row">
+                            <span class="metadata-label">Needs:</span>
+                            <span class="metadata-value">impl</span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Covers:</span>
+                            <span class="metadata-value"><span class="requirement-link">req~configuration-management~1</span></span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Outgoing Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-covers">req~configuration-management~1</span></span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Incoming Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-covered shallow">impl~configuration-system-5087074149644648145~0</span></span>
+                        </div></div>
+                </div><div class="spec-item" id="req-34">
+                    <div class="item-header">
+                        <h4 class="item-id">dsn~error-types~1</h4>
+                        <div class="item-status">
+                            <span class="coverage-badge">covered</span>
+                        </div>
+                    </div>
+                    
+                    <div class="item-content"><h5 class="item-title">dsn~error-types~1</h5><div class="item-description">**Title:** Comprehensive error type system
+**Description:** The system shall implement a comprehensive error type system using thiserror that provides detailed error messages with context information including file paths, line numbers, and specific failure descriptions.
+**Rationale:** A well-designed error system improves developer experience and makes debugging issues much easier.
+---</div></div>
+
+                    <div class="item-metadata"><div class="metadata-row">
+                                    <span class="metadata-label">Location:</span>
+                                    <span class="metadata-value">docs/requirements/design.md:85</span>
+                                </div><div class="metadata-row">
+                            <span class="metadata-label">Needs:</span>
+                            <span class="metadata-value">impl</span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Covers:</span>
+                            <span class="metadata-value"><span class="requirement-link">req~detailed-error-messages~1</span></span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Outgoing Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-covers">req~detailed-error-messages~1</span></span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Incoming Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-covered shallow">impl~error-types-14845299094946806561~0</span></span>
+                        </div></div>
+                </div><div class="spec-item" id="req-35">
+                    <div class="item-header">
+                        <h4 class="item-id">dsn~core-data-models~1</h4>
+                        <div class="item-status">
+                            <span class="coverage-badge">covered</span>
+                        </div>
+                    </div>
+                    
+                    <div class="item-content"><h5 class="item-title">dsn~core-data-models~1</h5><div class="item-description">**Title:** Core data model definitions
+**Description:** The system shall implement core data structures including SpecificationItem, SpecificationItemId, LinkedSpecificationItem, and TraceResult that accurately represent requirements tracing concepts and relationships.
+**Rationale:** Well-designed data models provide the foundation for all other system components and ensure data integrity.</div></div>
+
+                    <div class="item-metadata"><div class="metadata-row">
+                                    <span class="metadata-label">Location:</span>
+                                    <span class="metadata-value">docs/requirements/design.md:101</span>
+                                </div><div class="metadata-row">
+                            <span class="metadata-label">Needs:</span>
+                            <span class="metadata-value">impl</span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Covers:</span>
+                            <span class="metadata-value"><span class="requirement-link">req~coverage-analysis~1</span></span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Outgoing Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-covers">req~coverage-analysis~1</span></span>
+                        </div><div class="metadata-row">
+                            <span class="metadata-label">Incoming Links:</span>
+                            <span class="metadata-value"><span class="requirement-link link-covered shallow">impl~core-data-models-4496138226165708051~0</span></span>
+                        </div></div>
+                </div></div>
+        </section>
+    </div>
+    
+    <script>
+        // Make requirement IDs clickable by adding hyperlinks
+        document.addEventListener('DOMContentLoaded', function() {
+            // Create a map of requirement ID to anchor
+            const requirementElements = document.querySelectorAll('.spec-item');
+            const idToAnchor = new Map();
+            
+            requirementElements.forEach((element, index) => {
+                const idElement = element.querySelector('.item-id');
+                if (idElement) {
+                    const reqId = idElement.textContent.trim();
+                    const anchorId = `req-${index}`;
+                    element.id = anchorId;
+                    idToAnchor.set(reqId, anchorId);
+                }
+            });
+            
+            // Convert requirement text to links
+            const requirementLinks = document.querySelectorAll('.requirement-link');
+            requirementLinks.forEach(linkElement => {
+                const reqId = linkElement.textContent.trim();
+                if (idToAnchor.has(reqId)) {
+                    // Convert span to anchor
+                    const anchor = document.createElement('a');
+                    anchor.href = '#' + idToAnchor.get(reqId);
+                    anchor.className = linkElement.className;
+                    anchor.textContent = linkElement.textContent;
+                    linkElement.parentNode.replaceChild(anchor, linkElement);
+                }
+            });
+            
+            // Add smooth scrolling
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    const target = document.querySelector(this.getAttribute('href'));
+                    if (target) {
+                        target.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'center'
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

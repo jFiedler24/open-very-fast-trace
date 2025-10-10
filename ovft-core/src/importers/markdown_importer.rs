@@ -29,6 +29,12 @@ pub struct MarkdownImporter {
     comment_regex: Regex,
     /// Regex for matching specification item references in lists
     item_ref_regex: Regex,
+    /// Regex for matching title fields like "**Title:** Some title"
+    title_field_regex: Regex,
+    /// Regex for matching description fields like "**Description:** Some description"
+    description_field_regex: Regex,
+    /// Regex for matching rationale fields like "**Rationale:** Some rationale"
+    rationale_field_regex: Regex,
 }
 
 impl MarkdownImporter {
@@ -48,6 +54,9 @@ impl MarkdownImporter {
             rationale_regex: Regex::new(r"(?i)^\*?\*?Rationale:\*?\*?\s*$").unwrap(),
             comment_regex: Regex::new(r"(?i)^\*?\*?Comment:\*?\*?\s*$").unwrap(),
             item_ref_regex: Regex::new(r"([a-zA-Z]+)~([a-zA-Z0-9._-]+)~(\d+)").unwrap(),
+            title_field_regex: Regex::new(r"(?i)^\*?\*?Title:\*?\*?\s*(.+)$").unwrap(),
+            description_field_regex: Regex::new(r"(?i)^\*?\*?Description:\*?\*?\s*(.+)$").unwrap(),
+            rationale_field_regex: Regex::new(r"(?i)^\*?\*?Rationale:\*?\*?\s*(.+)$").unwrap(),
         }
     }
 
@@ -208,6 +217,25 @@ impl MarkdownImporter {
                 for cover_id in covers_list {
                     builder = builder.covers(cover_id);
                 }
+            } else if let Some(captures) = self.title_field_regex.captures(line) {
+                // Handle structured title fields like "**Title:** Some title"
+                let title_str = captures.get(1).unwrap().as_str().trim();
+                if !title_str.is_empty() {
+                    builder = builder.title(title_str.to_string());
+                }
+            } else if let Some(captures) = self.description_field_regex.captures(line) {
+                // Handle structured description fields like "**Description:** Some description"
+                let desc_str = captures.get(1).unwrap().as_str().trim();
+                if !desc_str.is_empty() {
+                    // Replace any existing description with the structured one
+                    description = desc_str.to_string();
+                }
+            } else if let Some(captures) = self.rationale_field_regex.captures(line) {
+                // Handle structured rationale fields like "**Rationale:** Some rationale"
+                let rationale_str = captures.get(1).unwrap().as_str().trim();
+                if !rationale_str.is_empty() {
+                    rationale = rationale_str.to_string();
+                }
             } else if self.covers_regex.is_match(line) {
                 current_section = Section::Covers;
             } else if self.depends_regex.is_match(line) {
@@ -256,8 +284,8 @@ impl MarkdownImporter {
                         );
                     }
                 }
-            } else if !line.trim().is_empty() {
-                // Regular content line
+            } else if !line.trim().is_empty() && !self.is_structured_field(line) {
+                // Regular content line (but skip structured fields)
                 self.append_to_section(
                     &mut description,
                     &mut rationale,
@@ -323,6 +351,21 @@ impl MarkdownImporter {
     /// Extract text from a heading line
     fn extract_heading_text(&self, line: &str) -> String {
         line.trim_start().trim_start_matches('#').trim().to_string()
+    }
+
+    /// Check if a line is a structured field that should not be added to description
+    fn is_structured_field(&self, line: &str) -> bool {
+        self.title_field_regex.is_match(line)
+            || self.description_field_regex.is_match(line)
+            || self.rationale_field_regex.is_match(line)
+            || self.needs_regex.is_match(line)
+            || self.covers_inline_regex.is_match(line)
+            || self.covers_regex.is_match(line)
+            || self.depends_regex.is_match(line)
+            || self.tags_regex.is_match(line)
+            || self.status_regex.is_match(line)
+            || self.rationale_regex.is_match(line)
+            || self.comment_regex.is_match(line)
     }
 
     /// Parse a comma-separated list of covers

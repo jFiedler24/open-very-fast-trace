@@ -147,6 +147,37 @@ impl Config {
         Ok(config)
     }
 
+    /// Load configuration from .ovft.toml file if it exists, otherwise return default
+    pub fn load_or_default() -> Self {
+        Self::load_from_current_dir().unwrap_or_else(|| Self::default())
+    }
+
+    /// Try to load configuration from .ovft.toml in current directory or parent directories
+    pub fn load_from_current_dir() -> Option<Self> {
+        let current_dir = std::env::current_dir().ok()?;
+        Self::find_and_load_config(&current_dir)
+    }
+
+    /// Search for .ovft.toml file starting from the given directory and walking up parent directories
+    pub fn find_and_load_config(start_dir: &std::path::Path) -> Option<Self> {
+        let mut current = start_dir.to_path_buf();
+
+        loop {
+            let config_path = current.join(".ovft.toml");
+            if config_path.exists() {
+                if let Ok(config) = Self::from_file(&config_path) {
+                    return Some(config);
+                }
+            }
+
+            if !current.pop() {
+                break;
+            }
+        }
+
+        None
+    }
+
     /// Save configuration to a TOML file
     pub fn save_to_file<P: AsRef<std::path::Path>>(&self, path: P) -> crate::Result<()> {
         let content = toml::to_string_pretty(self)?;
@@ -233,5 +264,24 @@ mod tests {
         assert!(config.is_spec_file(Path::new("spec.markdown")));
         assert!(!config.is_spec_file(Path::new("main.rs")));
         assert!(!config.is_spec_file(Path::new("config.toml")));
+    }
+
+    #[test]
+    fn test_config_serialization() {
+        let config = Config::default();
+        let toml_str = toml::to_string(&config).unwrap();
+        let deserialized: Config = toml::from_str(&toml_str).unwrap();
+        
+        assert_eq!(config.source_dirs, deserialized.source_dirs);
+        assert_eq!(config.spec_dirs, deserialized.spec_dirs);
+        assert_eq!(config.source_patterns, deserialized.source_patterns);
+        assert_eq!(config.artifact_types, deserialized.artifact_types);
+    }
+
+    #[test]
+    fn test_load_or_default() {
+        // This should not panic and return a valid config
+        let config = Config::load_or_default();
+        assert!(!config.artifact_types.is_empty());
     }
 }

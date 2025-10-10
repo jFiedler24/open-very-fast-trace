@@ -149,6 +149,63 @@ Open `target/requirements_report.html` in your browser to see:
 
 ## 🔧 **Build Integration**
 
+### **Configuration File**
+
+Create a `.ovft.toml` file in your project root to customize the tracing behavior:
+
+```toml
+# .ovft.toml
+
+# Directories containing source code files to scan for tags
+source_dirs = ["src", "lib", "crates"]
+
+# Directories containing specification files (markdown)
+spec_dirs = ["docs", "requirements", "specs"]
+
+# File patterns to include when scanning source directories
+source_patterns = [
+    "*.rs",          # Rust files
+    "*.java",        # Java files
+    "*.py",          # Python files
+    "*.js",          # JavaScript files
+    "*.ts",          # TypeScript files
+    # Add more file extensions as needed
+]
+
+# File patterns to exclude when scanning
+exclude_patterns = [
+    "target/**",
+    "node_modules/**",
+    ".git/**",
+    "*.tmp",
+    "*.bak",
+]
+
+# Additional artifact types to recognize in tags
+artifact_types = [
+    "feat",      # Features
+    "req",       # Requirements
+    "arch",      # Architecture
+    "dsn",       # Design
+    "impl",      # Implementation
+    "utest",     # Unit tests
+    "itest",     # Integration tests
+    "stest",     # System tests
+]
+
+# Whether to generate detailed reports
+verbose = false
+
+# Output directory for reports
+output_dir = "target"
+```
+
+**Configuration Priority (highest to lowest):**
+1. Command line arguments (`--source-dirs`, `--output`, etc.)
+2. Explicit config file (`--config custom.toml`)
+3. Auto-discovered `.ovft.toml` in current or parent directories
+4. Default configuration
+
 ### **Simple build.rs Integration**
 ```rust
 // build.rs

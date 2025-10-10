@@ -48,6 +48,13 @@ fn main() -> Result<()> {
                         .action(clap::ArgAction::SetTrue),
                 )
                 .arg(
+                    Arg::new("config")
+                        .long("config")
+                        .value_name("FILE")
+                        .help("Path to configuration file (.ovft.toml)")
+                        .required(false),
+                )
+                .arg(
                     Arg::new("check")
                         .short('c')
                         .long("check")
@@ -70,6 +77,7 @@ fn run_ovft(matches: &ArgMatches) -> Result<()> {
     let format = matches.get_one::<String>("format").unwrap();
     let verbose = matches.get_flag("verbose");
     let check_mode = matches.get_flag("check");
+    let config_file = matches.get_one::<String>("config");
 
     if verbose {
         println!("🔍 Running OVFT requirements traceability analysis");
@@ -87,12 +95,36 @@ fn run_ovft(matches: &ArgMatches) -> Result<()> {
         println!("🏠 Project root: {}", project_root.display());
     }
 
-    // Create configuration using the builder pattern
-    let config = Config::default()
-        .add_source_dir("src")
-        .add_spec_dir(input_dir)
-        .output_dir(PathBuf::from(output_file).parent().unwrap())
-        .verbose(verbose);
+    // Load configuration - either from specified file, auto-discover .ovft.toml, or use defaults
+    let mut config = if let Some(config_path) = config_file {
+        if verbose {
+            println!("📋 Loading configuration from: {}", config_path);
+        }
+        Config::from_file(config_path)
+            .with_context(|| format!("Failed to load configuration from {}", config_path))?
+    } else {
+        if verbose {
+            println!("📋 Looking for .ovft.toml configuration file...");
+        }
+        let loaded_config = Config::load_or_default();
+        if Config::find_and_load_config(&current_dir).is_some() && verbose {
+            println!("✅ Found and loaded .ovft.toml configuration");
+        } else if verbose {
+            println!("ℹ️  No .ovft.toml found, using default configuration");
+        }
+        loaded_config
+    };
+
+    // Override configuration with command line arguments
+    if input_dir != "." {
+        config.spec_dirs = vec![PathBuf::from(input_dir)];
+    }
+    
+    if let Some(output_parent) = PathBuf::from(output_file).parent() {
+        config.output_dir = Some(output_parent.to_path_buf());
+    }
+    
+    config.verbose = verbose;
 
     // Run the tracer
     let tracer = Tracer::new(config);

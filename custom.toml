@@ -1,0 +1,8 @@
+# Custom configuration example
+source_dirs = ["cargo-ovft/src"]
+spec_dirs = ["docs/requirements"]
+source_patterns = ["*.rs"]
+exclude_patterns = ["target/**", ".git/**"]
+artifact_types = ["feat", "req", "impl", "utest"]
+verbose = true
+output_dir = "custom_output"
