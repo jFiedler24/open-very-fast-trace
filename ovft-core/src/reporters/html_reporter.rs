@@ -1,6 +1,6 @@
+use askama::Template;
 use std::fs;
 use std::path::Path;
-use askama::Template;
 
 use crate::config::Config;
 use crate::core::TraceResult;
@@ -24,7 +24,7 @@ impl HtmlReporter {
         };
 
         let html = template.render()?;
-        
+
         // Ensure output directory exists
         if let Some(parent) = output_path.parent() {
             fs::create_dir_all(parent)?;
@@ -46,30 +46,29 @@ struct HtmlReportTemplate<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::{SpecificationItem, SpecificationItemId, LinkedSpecificationItem};
+    use crate::core::{LinkedSpecificationItem, SpecificationItem, SpecificationItemId};
     use std::collections::HashMap;
 
     #[test]
     fn test_html_reporter_creation() {
         let config = Config::default();
         let _reporter = HtmlReporter::new(&config);
-        // Basic creation test
-        assert!(true);
+        // Basic creation test - reporter should be created successfully
     }
 
     #[test]
     fn test_template_rendering() {
         // Create a simple trace result for testing
-        let items = vec![
-            LinkedSpecificationItem::new(
-                SpecificationItem::builder(
-                    SpecificationItemId::new("req".to_string(), "test".to_string(), 1)
-                )
-                .title("Test Requirement".to_string())
-                .description("A test requirement".to_string())
-                .build()
-            )
-        ];
+        let items = vec![LinkedSpecificationItem::new(
+            SpecificationItem::builder(SpecificationItemId::new(
+                "req".to_string(),
+                "test".to_string(),
+                1,
+            ))
+            .title("Test Requirement".to_string())
+            .description("A test requirement".to_string())
+            .build(),
+        )];
 
         let trace_result = TraceResult {
             items,

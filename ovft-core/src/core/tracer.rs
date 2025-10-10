@@ -1,10 +1,10 @@
+use crate::config::Config;
+use crate::core::Linker;
+use crate::core::{CoverageStatus, CoverageSummary, Defect, LinkedSpecificationItem};
+use crate::importers::{MarkdownImporter, TagImporter};
+use crate::Result;
 use std::collections::HashMap;
 use std::path::Path;
-use crate::core::{LinkedSpecificationItem, CoverageStatus, Defect, CoverageSummary};
-use crate::config::Config;
-use crate::importers::{TagImporter, MarkdownImporter};
-use crate::core::Linker;
-use crate::Result;
 
 /// Main tracer that orchestrates the requirement tracing process
 pub struct Tracer {
@@ -27,7 +27,7 @@ impl Tracer {
     pub fn trace(&self) -> Result<TraceResult> {
         // 1. Import specification items from all sources
         let mut items = Vec::new();
-        
+
         // Import from source code files
         for source_dir in &self.config.source_dirs {
             let source_items = self.tag_importer.import_from_directory(source_dir)?;
@@ -51,7 +51,11 @@ impl Tracer {
     }
 
     /// Generate an HTML report for the trace result
-    pub fn generate_html_report(&self, trace_result: &TraceResult, output_path: &Path) -> Result<()> {
+    pub fn generate_html_report(
+        &self,
+        trace_result: &TraceResult,
+        output_path: &Path,
+    ) -> Result<()> {
         let reporter = crate::reporters::HtmlReporter::new(&self.config);
         reporter.generate_report(trace_result, output_path)
     }
@@ -75,8 +79,12 @@ impl Tracer {
         for (artifact_type, items) in artifact_groups {
             let total = items.len();
             let covered = items.iter().filter(|item| item.is_covered()).count();
-            let percentage = if total > 0 { (covered as f64 / total as f64) * 100.0 } else { 100.0 };
-            
+            let percentage = if total > 0 {
+                (covered as f64 / total as f64) * 100.0
+            } else {
+                100.0
+            };
+
             let status = if covered == total {
                 CoverageStatus::Covered
             } else if covered > 0 {
@@ -85,12 +93,15 @@ impl Tracer {
                 CoverageStatus::Uncovered
             };
 
-            coverage_summary.insert(artifact_type, CoverageSummary {
-                total,
-                covered,
-                percentage,
-                status,
-            });
+            coverage_summary.insert(
+                artifact_type,
+                CoverageSummary {
+                    total,
+                    covered,
+                    percentage,
+                    status,
+                },
+            );
         }
 
         // Collect defective items
@@ -155,7 +166,10 @@ impl TraceResult {
         let mut result = HashMap::new();
         for item in &self.items {
             let artifact_type = &item.item.id.artifact_type;
-            result.entry(artifact_type.clone()).or_insert_with(Vec::new).push(item);
+            result
+                .entry(artifact_type.clone())
+                .or_insert_with(Vec::new)
+                .push(item);
         }
         result
     }

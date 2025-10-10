@@ -5,7 +5,7 @@ use std::process;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    
+
     if args.len() < 2 {
         println!("Usage: {} [OPTIONS]", args[0]);
         println!("Options:");
@@ -19,7 +19,7 @@ fn main() {
     let mut source_dirs = Vec::new();
     let mut spec_dirs = Vec::new();
     let mut output_path = PathBuf::from("requirements_report.html");
-    
+
     let mut i = 1;
     while i < args.len() {
         match args[i].as_str() {
@@ -57,7 +57,9 @@ fn main() {
                 println!();
                 println!("Options:");
                 println!("  --source-dirs <dirs>   Source directories to scan (comma separated)");
-                println!("  --spec-dirs <dirs>     Specification directories to scan (comma separated)");
+                println!(
+                    "  --spec-dirs <dirs>     Specification directories to scan (comma separated)"
+                );
                 println!("  --output <file>        Output HTML file path (default: requirements_report.html)");
                 println!("  --help                 Show this help message");
                 process::exit(0);
@@ -71,18 +73,18 @@ fn main() {
 
     // Build configuration
     let mut config = Config::empty();
-    
+
     for source_dir in source_dirs {
         config = config.add_source_dir(source_dir);
     }
-    
+
     for spec_dir in spec_dirs {
         config = config.add_spec_dir(spec_dir);
     }
 
     // Create tracer and run analysis
     let tracer = Tracer::new(config);
-    
+
     println!("Running requirements tracing...");
     let trace_result = match tracer.trace() {
         Ok(result) => result,
@@ -112,7 +114,7 @@ fn main() {
     }
 
     println!("HTML report generated successfully!");
-    
+
     if trace_result.defect_count > 0 {
         process::exit(1); // Exit with error code if defects found
     }

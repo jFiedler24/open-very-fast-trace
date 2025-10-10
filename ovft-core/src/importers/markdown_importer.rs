@@ -1,10 +1,10 @@
+use crate::config::Config;
+use crate::core::{ItemStatus, Location, SpecificationItem, SpecificationItemId};
+use crate::Result;
+use regex::Regex;
 use std::fs;
 use std::path::Path;
-use regex::Regex;
 use walkdir::WalkDir;
-use crate::core::{SpecificationItem, SpecificationItemId, ItemStatus, Location};
-use crate::config::Config;
-use crate::Result;
 
 /// Importer for parsing requirement specifications from markdown files
 /// [impl->dsn~markdown-importer-module~1]
@@ -41,7 +41,10 @@ impl MarkdownImporter {
             covers_inline_regex: Regex::new(r"(?i)^\*?\*?Covers:\*?\*?\s*(.+)$").unwrap(),
             depends_regex: Regex::new(r"(?i)^\*?\*?Depends:\*?\*?\s*$").unwrap(),
             tags_regex: Regex::new(r"(?i)^\*?\*?Tags:\*?\*?\s*(.+)$").unwrap(),
-            status_regex: Regex::new(r"(?i)^\*?\*?Status:\*?\*?\s*(draft|proposed|approved|rejected)\s*$").unwrap(),
+            status_regex: Regex::new(
+                r"(?i)^\*?\*?Status:\*?\*?\s*(draft|proposed|approved|rejected)\s*$",
+            )
+            .unwrap(),
             rationale_regex: Regex::new(r"(?i)^\*?\*?Rationale:\*?\*?\s*$").unwrap(),
             comment_regex: Regex::new(r"(?i)^\*?\*?Comment:\*?\*?\s*$").unwrap(),
             item_ref_regex: Regex::new(r"([a-zA-Z]+)~([a-zA-Z0-9._-]+)~(\d+)").unwrap(),
@@ -51,7 +54,7 @@ impl MarkdownImporter {
     /// Import specification items from a directory
     pub fn import_from_directory(&self, dir: &Path) -> Result<Vec<SpecificationItem>> {
         let mut items = Vec::new();
-        
+
         if !dir.exists() {
             log::warn!("Directory does not exist: {}", dir.display());
             return Ok(items);
@@ -59,7 +62,7 @@ impl MarkdownImporter {
 
         for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
             let path = entry.path();
-            
+
             if path.is_file() && self.is_markdown_file(path) {
                 let file_items = self.import_from_file(path)?;
                 items.extend(file_items);
@@ -83,10 +86,12 @@ impl MarkdownImporter {
 
         while line_number < lines.len() {
             let line = lines[line_number];
-            
+
             // Look for specification item IDs in regular text (backticks)
             if let Some(captures) = self.id_regex.captures(line) {
-                if let Some(item) = self.parse_specification_item(&lines, &mut line_number, file_path, &captures)? {
+                if let Some(item) =
+                    self.parse_specification_item(&lines, &mut line_number, file_path, &captures)?
+                {
                     items.push(item);
                 }
             }
@@ -94,12 +99,17 @@ impl MarkdownImporter {
             else if self.is_heading(line) {
                 let heading_text = self.extract_heading_text(line);
                 if let Some(captures) = self.item_ref_regex.captures(&heading_text) {
-                    if let Some(item) = self.parse_specification_item(&lines, &mut line_number, file_path, &captures)? {
+                    if let Some(item) = self.parse_specification_item(
+                        &lines,
+                        &mut line_number,
+                        file_path,
+                        &captures,
+                    )? {
                         items.push(item);
                     }
                 }
             }
-            
+
             line_number += 1;
         }
 
@@ -108,26 +118,23 @@ impl MarkdownImporter {
 
     /// Parse a complete specification item starting from the ID line
     fn parse_specification_item(
-        &self, 
-        lines: &[&str], 
-        line_number: &mut usize, 
-        file_path: &Path, 
-        id_captures: &regex::Captures
+        &self,
+        lines: &[&str],
+        line_number: &mut usize,
+        file_path: &Path,
+        id_captures: &regex::Captures,
     ) -> Result<Option<SpecificationItem>> {
         let artifact_type = id_captures.get(1).unwrap().as_str();
         let name = id_captures.get(2).unwrap().as_str();
         let revision_str = id_captures.get(3).unwrap().as_str();
-        let revision = revision_str.parse::<u32>()
+        let revision = revision_str
+            .parse::<u32>()
             .map_err(|_| crate::Error::Parse {
                 message: format!("Invalid revision number: {}", revision_str),
                 location: format!("{}:{}", file_path.display(), *line_number + 1),
             })?;
 
-        let id = SpecificationItemId::new(
-            artifact_type.to_string(),
-            name.to_string(),
-            revision,
-        );
+        let id = SpecificationItemId::new(artifact_type.to_string(), name.to_string(), revision);
 
         let location = Location::new(file_path.to_path_buf(), (*line_number + 1) as u32);
         let mut builder = SpecificationItem::builder(id).location(location);
@@ -140,14 +147,18 @@ impl MarkdownImporter {
                 builder = builder.title(title);
             }
         }
-        
+
         // If ID is in a heading line itself, extract title from that line
         let current_line = lines[*line_number];
         if self.is_heading(current_line) {
             let heading_text = self.extract_heading_text(current_line);
             // Remove the ID part from the heading to get title
-            if let Some(pos) = heading_text.find(&format!("{}~{}~{}", artifact_type, name, revision)) {
-                let title_part = heading_text[pos + format!("{}~{}~{}", artifact_type, name, revision).len()..].trim();
+            if let Some(pos) =
+                heading_text.find(&format!("{}~{}~{}", artifact_type, name, revision))
+            {
+                let title_part = heading_text
+                    [pos + format!("{}~{}~{}", artifact_type, name, revision).len()..]
+                    .trim();
                 if !title_part.is_empty() {
                     builder = builder.title(title_part.to_string());
                 } else {
@@ -170,7 +181,7 @@ impl MarkdownImporter {
 
         while *line_number < lines.len() {
             let line = lines[*line_number];
-            
+
             // Check if we've reached another specification item
             if self.id_regex.is_match(line) {
                 *line_number -= 1; // Back up so the outer loop can process this
@@ -219,7 +230,10 @@ impl MarkdownImporter {
                 current_section = Section::Rationale;
             } else if self.comment_regex.is_match(line) {
                 current_section = Section::Comment;
-            } else if line.trim().starts_with('-') || line.trim().starts_with('*') || line.trim().starts_with('+') {
+            } else if line.trim().starts_with('-')
+                || line.trim().starts_with('*')
+                || line.trim().starts_with('+')
+            {
                 // Handle bullet point lists
                 match current_section {
                     Section::Covers => {
@@ -233,12 +247,24 @@ impl MarkdownImporter {
                         }
                     }
                     _ => {
-                        self.append_to_section(&mut description, &mut rationale, &mut comment, current_section, line);
+                        self.append_to_section(
+                            &mut description,
+                            &mut rationale,
+                            &mut comment,
+                            current_section,
+                            line,
+                        );
                     }
                 }
             } else if !line.trim().is_empty() {
                 // Regular content line
-                self.append_to_section(&mut description, &mut rationale, &mut comment, current_section, line);
+                self.append_to_section(
+                    &mut description,
+                    &mut rationale,
+                    &mut comment,
+                    current_section,
+                    line,
+                );
             }
 
             *line_number += 1;
@@ -296,10 +322,7 @@ impl MarkdownImporter {
 
     /// Extract text from a heading line
     fn extract_heading_text(&self, line: &str) -> String {
-        line.trim_start()
-            .trim_start_matches('#')
-            .trim()
-            .to_string()
+        line.trim_start().trim_start_matches('#').trim().to_string()
     }
 
     /// Parse a comma-separated list of covers
@@ -340,7 +363,7 @@ impl MarkdownImporter {
             let artifact_type = captures.get(1)?.as_str();
             let name = captures.get(2)?.as_str();
             let revision = captures.get(3)?.as_str().parse::<u32>().ok()?;
-            
+
             Some(SpecificationItemId::new(
                 artifact_type.to_string(),
                 name.to_string(),
@@ -377,8 +400,8 @@ impl Default for MarkdownImporter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::NamedTempFile;
     use std::io::Write;
+    use tempfile::NamedTempFile;
 
     #[test]
     fn test_parse_simple_requirement() {
@@ -393,11 +416,11 @@ Needs: dsn, impl, utest
 Tags: security, login
 Status: approved
 "#;
-        
+
         let temp_file = NamedTempFile::new().unwrap();
         let items = importer.parse_markdown(content, temp_file.path()).unwrap();
         assert_eq!(items.len(), 1);
-        
+
         let item = &items[0];
         assert_eq!(item.id.artifact_type, "req");
         assert_eq!(item.id.name, "user-authentication");
@@ -423,11 +446,11 @@ Covers:
 
 Needs: impl, utest
 "#;
-        
+
         let temp_file = NamedTempFile::new().unwrap();
         let items = importer.parse_markdown(content, temp_file.path()).unwrap();
         assert_eq!(items.len(), 1);
-        
+
         let item = &items[0];
         assert_eq!(item.covers.len(), 2);
         assert_eq!(item.covers[0].name, "user-authentication");
@@ -452,15 +475,19 @@ in future versions.
 
 Needs: dsn
 "#;
-        
+
         let temp_file = NamedTempFile::new().unwrap();
         let items = importer.parse_markdown(content, temp_file.path()).unwrap();
         assert_eq!(items.len(), 1);
-        
+
         let item = &items[0];
         assert!(item.rationale.is_some());
         assert!(item.comment.is_some());
-        assert!(item.rationale.as_ref().unwrap().contains("password security"));
+        assert!(item
+            .rationale
+            .as_ref()
+            .unwrap()
+            .contains("password security"));
         assert!(item.comment.as_ref().unwrap().contains("future versions"));
     }
 
@@ -469,17 +496,17 @@ Needs: dsn
         let importer = MarkdownImporter::new();
         let mut temp_file = NamedTempFile::with_suffix(".md").unwrap();
         writeln!(temp_file, "# Requirements Document").unwrap();
-        writeln!(temp_file, "").unwrap();
+        writeln!(temp_file).unwrap();
         writeln!(temp_file, "## Authentication").unwrap();
         writeln!(temp_file, "`req~auth~1`").unwrap();
-        writeln!(temp_file, "").unwrap();
+        writeln!(temp_file).unwrap();
         writeln!(temp_file, "User authentication is required.").unwrap();
-        writeln!(temp_file, "").unwrap();
+        writeln!(temp_file).unwrap();
         writeln!(temp_file, "Needs: dsn").unwrap();
-        
+
         let items = importer.import_from_file(temp_file.path()).unwrap();
         assert_eq!(items.len(), 1);
-        
+
         let item = &items[0];
         assert_eq!(item.id.name, "auth");
         assert_eq!(item.title, Some("Authentication".to_string()));

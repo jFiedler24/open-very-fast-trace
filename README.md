@@ -1,9 +1,10 @@
 # Open Very Fast Trace 🚀
 
+[![CI/CD Pipeline](https://github.com/jFiedler24/open-very-fast-trace/workflows/CI/CD%20Pipeline/badge.svg)](https://github.com/jFiedler24/open-very-fast-trace/actions)
 [![Crates.io](https://img.shields.io/crates/v/cargo-ovft.svg)](https://crates.io/crates/cargo-ovft)
 [![Documentation](https://docs.rs/cargo-ovft/badge.svg)](https://docs.rs/cargo-ovft)
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
-[![Build Status](https://github.com/yourusername/open-very-fast-trace/workflows/CI/badge.svg)](https://github.com/yourusername/open-very-fast-trace/actions)
+[![GitHub Release](https://img.shields.io/github/v/release/jFiedler24/open-very-fast-trace)](https://github.com/jFiedler24/open-very-fast-trace/releases)
 
 **A Rust-native requirements tracing solution inspired by and compatible with [OpenFastTrace](https://github.com/itsallcode/openfasttrace).**
 

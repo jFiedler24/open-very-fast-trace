@@ -1,5 +1,5 @@
-use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 /// Configuration for the requirements tracing process
 /// [impl->dsn~configuration-system~1]
@@ -83,15 +83,8 @@ impl Config {
         Self {
             source_dirs: vec![],
             spec_dirs: vec![],
-            source_patterns: vec![
-                "*.rs".to_string(),
-                "*.adl".to_string(),
-                "*.atl".to_string(),
-            ],
-            exclude_patterns: vec![
-                "target/**".to_string(),
-                ".git/**".to_string(),
-            ],
+            source_patterns: vec!["*.rs".to_string(), "*.adl".to_string(), "*.atl".to_string()],
+            exclude_patterns: vec!["target/**".to_string(), ".git/**".to_string()],
             artifact_types: vec![
                 "feat".to_string(),
                 "req".to_string(),
@@ -164,7 +157,7 @@ impl Config {
     /// Check if a file path matches the source patterns
     pub fn matches_source_pattern(&self, path: &std::path::Path) -> bool {
         let path_str = path.to_string_lossy();
-        
+
         // Check if excluded
         for exclude_pattern in &self.exclude_patterns {
             if glob::Pattern::new(exclude_pattern)
@@ -225,7 +218,7 @@ mod tests {
     #[test]
     fn test_source_pattern_matching() {
         let config = Config::default();
-        
+
         assert!(config.matches_source_pattern(Path::new("src/main.rs")));
         assert!(config.matches_source_pattern(Path::new("test.java")));
         assert!(!config.matches_source_pattern(Path::new("target/debug/main")));
@@ -235,7 +228,7 @@ mod tests {
     #[test]
     fn test_spec_file_detection() {
         let config = Config::default();
-        
+
         assert!(config.is_spec_file(Path::new("requirements.md")));
         assert!(config.is_spec_file(Path::new("spec.markdown")));
         assert!(!config.is_spec_file(Path::new("main.rs")));

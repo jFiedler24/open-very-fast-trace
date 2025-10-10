@@ -1,11 +1,12 @@
-use std::collections::HashMap;
-use crate::core::{SpecificationItem, LinkedSpecificationItem, SpecificationItemId, LinkStatus, CoverageStatus};
+use crate::core::{
+    CoverageStatus, LinkStatus, LinkedSpecificationItem, SpecificationItem, SpecificationItemId,
+};
 use crate::Result;
+use std::collections::HashMap;
 
 /// Linker that creates relationships between specification items
 /// [impl->dsn~linker-module~1]
-pub struct Linker {
-}
+pub struct Linker {}
 
 impl Linker {
     pub fn new() -> Self {
@@ -13,7 +14,10 @@ impl Linker {
     }
 
     /// Link specification items together and analyze coverage
-    pub fn link_items(&self, items: Vec<SpecificationItem>) -> Result<Vec<LinkedSpecificationItem>> {
+    pub fn link_items(
+        &self,
+        items: Vec<SpecificationItem>,
+    ) -> Result<Vec<LinkedSpecificationItem>> {
         // First, build the lookup map and check for duplicates
         let mut items_by_id = HashMap::new();
         let mut duplicate_ids = Vec::new();
@@ -30,7 +34,7 @@ impl Linker {
         let mut linked_items = Vec::new();
         for item in items {
             let mut linked_item = LinkedSpecificationItem::new(item.clone());
-            
+
             // Mark duplicates as defects
             if duplicate_ids.contains(&item.id) {
                 linked_item.is_defect = true;
@@ -54,22 +58,22 @@ impl Linker {
         items_by_id: &HashMap<SpecificationItemId, SpecificationItem>,
     ) -> Result<()> {
         // Process outgoing links for each item
-        for i in 0..linked_items.len() {
-            let covers = linked_items[i].item.covers.clone();
+        for item in linked_items.iter_mut() {
+            let covers = item.item.covers.clone();
             for covered_id in &covers {
                 let link_status = self.determine_link_status(covered_id, items_by_id);
-                linked_items[i].add_outgoing_link(covered_id.clone(), link_status);
+                item.add_outgoing_link(covered_id.clone(), link_status);
             }
         }
 
         // Process incoming links
         let items_clone: Vec<_> = linked_items.iter().map(|li| li.item.clone()).collect();
-        for i in 0..linked_items.len() {
-            let item_id = linked_items[i].item.id.clone();
+        for item in linked_items.iter_mut() {
+            let item_id = item.item.id.clone();
             for other_item in &items_clone {
                 if other_item.covers.contains(&item_id) {
                     let link_status = self.determine_incoming_link_status(&item_id, &other_item.id);
-                    linked_items[i].add_incoming_link(other_item.id.clone(), link_status);
+                    item.add_incoming_link(other_item.id.clone(), link_status);
                 }
             }
         }
@@ -131,11 +135,12 @@ impl Linker {
     /// Analyze coverage status for each item
     fn analyze_coverage(&self, linked_items: &mut [LinkedSpecificationItem]) {
         // Clone the data we need to avoid borrowing issues
-        let items_data: Vec<_> = linked_items.iter().map(|li| (li.item.clone(), li.outgoing_links.clone())).collect();
-        
-        for i in 0..linked_items.len() {
-            let linked_item = &mut linked_items[i];
-            
+        let items_data: Vec<_> = linked_items
+            .iter()
+            .map(|li| (li.item.clone(), li.outgoing_links.clone()))
+            .collect();
+
+        for linked_item in linked_items.iter_mut() {
             // If item has no requirements, it's considered covered (terminating item)
             if linked_item.item.needs.is_empty() {
                 linked_item.coverage_status = CoverageStatus::Covered;
@@ -146,7 +151,11 @@ impl Linker {
                 let mut any_covered = false;
 
                 for needed_type in &linked_item.item.needs.clone() {
-                    let is_covered = self.is_artifact_type_covered_static(&linked_item.item.id, needed_type, &items_data);
+                    let is_covered = self.is_artifact_type_covered_static(
+                        &linked_item.item.id,
+                        needed_type,
+                        &items_data,
+                    );
                     if is_covered {
                         any_covered = true;
                     } else {
@@ -176,7 +185,7 @@ impl Linker {
                         | LinkStatus::Duplicate
                 )
             });
-            
+
             linked_item.is_defect = not_covered || has_broken_links;
         }
     }
@@ -212,15 +221,15 @@ mod tests {
     #[test]
     fn test_simple_linking() {
         let linker = Linker::new();
-        
+
         // Create a feature and a requirement that covers it
         let feat_id = SpecificationItemId::new("feat".to_string(), "login".to_string(), 1);
         let req_id = SpecificationItemId::new("req".to_string(), "login".to_string(), 1);
-        
+
         let feat = SpecificationItem::builder(feat_id.clone())
             .needs("req".to_string())
             .build();
-            
+
         let req = SpecificationItem::builder(req_id.clone())
             .covers(feat_id.clone())
             .build();
@@ -229,13 +238,19 @@ mod tests {
         let linked_items = linker.link_items(items).unwrap();
 
         assert_eq!(linked_items.len(), 2);
-        
+
         // Check that feature is covered
-        let feat_linked = linked_items.iter().find(|li| li.item.id == feat_id).unwrap();
+        let feat_linked = linked_items
+            .iter()
+            .find(|li| li.item.id == feat_id)
+            .unwrap();
         assert!(feat_linked.is_covered());
-        
+
         // Check that requirement has outgoing link
         let req_linked = linked_items.iter().find(|li| li.item.id == req_id).unwrap();
-        assert!(req_linked.outgoing_links.iter().any(|link| link.target_id == feat_id));
+        assert!(req_linked
+            .outgoing_links
+            .iter()
+            .any(|link| link.target_id == feat_id));
     }
 }

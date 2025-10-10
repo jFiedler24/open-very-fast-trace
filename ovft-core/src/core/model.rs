@@ -1,6 +1,6 @@
+use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::path::PathBuf;
-use serde::{Deserialize, Serialize};
 
 /// Represents a specification item ID with artifact type, name, and revision
 /// [impl->dsn~core-data-models~1]
@@ -154,7 +154,7 @@ impl SpecificationItem {
     pub fn title_or_fallback(&self) -> String {
         self.title
             .clone()
-            .unwrap_or_else(|| self.id.name.replace('-', " ").replace('_', " "))
+            .unwrap_or_else(|| self.id.name.replace(['-', '_'], " "))
     }
 
     /// Check if this item is a terminating item (doesn't need coverage)

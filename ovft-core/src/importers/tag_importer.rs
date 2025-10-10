@@ -1,10 +1,10 @@
+use regex::Regex;
 use std::fs;
 use std::path::Path;
-use regex::Regex;
 use walkdir::WalkDir;
 
-use crate::core::{SpecificationItem, SpecificationItemId, Location};
 use crate::config::Config;
+use crate::core::{Location, SpecificationItem, SpecificationItemId};
 use crate::Result;
 
 /// Importer for parsing requirement tags from source code files
@@ -34,7 +34,7 @@ impl TagImporter {
     /// Import specification items from a directory
     pub fn import_from_directory(&self, dir: &Path) -> Result<Vec<SpecificationItem>> {
         let mut items = Vec::new();
-        
+
         if !dir.exists() {
             log::warn!("Directory does not exist: {}", dir.display());
             return Ok(items);
@@ -42,7 +42,7 @@ impl TagImporter {
 
         for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
             let path = entry.path();
-            
+
             if path.is_file() && self.should_scan_file(path) {
                 let file_items = self.import_from_file(path)?;
                 items.extend(file_items);
@@ -56,7 +56,7 @@ impl TagImporter {
     pub fn import_from_file(&self, file_path: &Path) -> Result<Vec<SpecificationItem>> {
         let content = fs::read_to_string(file_path)?;
         let mut items = Vec::new();
-        
+
         for (line_number, line) in content.lines().enumerate() {
             let line_items = self.parse_line(line, file_path, line_number as u32 + 1)?;
             items.extend(line_items);
@@ -66,7 +66,12 @@ impl TagImporter {
     }
 
     /// Parse a single line for requirement tags
-    fn parse_line(&self, line: &str, file_path: &Path, line_number: u32) -> Result<Vec<SpecificationItem>> {
+    fn parse_line(
+        &self,
+        line: &str,
+        file_path: &Path,
+        line_number: u32,
+    ) -> Result<Vec<SpecificationItem>> {
         let mut items = Vec::new();
         let location = Location::new(file_path.to_path_buf(), line_number);
 
@@ -88,18 +93,24 @@ impl TagImporter {
     }
 
     /// Parse a full tag like [impl->dsn~validate-authentication-request~1]
-    fn parse_full_tag(&self, captures: &regex::Captures, location: &Location) -> Result<Option<SpecificationItem>> {
+    fn parse_full_tag(
+        &self,
+        captures: &regex::Captures,
+        location: &Location,
+    ) -> Result<Option<SpecificationItem>> {
         let artifact_type = captures.get(1).unwrap().as_str();
         let name = captures.get(2).map(|m| m.as_str());
         let revision = captures.get(3).map(|m| m.as_str());
         let covered_artifact_type = captures.get(4).unwrap().as_str();
         let covered_name = captures.get(5).unwrap().as_str();
         let covered_revision_str = captures.get(6).unwrap().as_str();
-        let covered_revision = covered_revision_str.parse::<u32>()
-            .map_err(|_| crate::Error::Parse {
-                message: format!("Invalid revision number: {}", covered_revision_str),
-                location: location.to_string(),
-            })?;
+        let covered_revision =
+            covered_revision_str
+                .parse::<u32>()
+                .map_err(|_| crate::Error::Parse {
+                    message: format!("Invalid revision number: {}", covered_revision_str),
+                    location: location.to_string(),
+                })?;
         let needs_str = captures.get(7).map(|m| m.as_str());
 
         // Create the covering item
@@ -107,7 +118,11 @@ impl TagImporter {
             name.to_string()
         } else {
             // Generate a name based on the covered item and location
-            format!("{}-{}", covered_name, self.generate_hash(&location.to_string()))
+            format!(
+                "{}-{}",
+                covered_name,
+                self.generate_hash(&location.to_string())
+            )
         };
 
         let item_revision = if let Some(revision) = revision {
@@ -119,11 +134,7 @@ impl TagImporter {
             0 // Default revision for auto-generated items
         };
 
-        let item_id = SpecificationItemId::new(
-            artifact_type.to_string(),
-            item_name,
-            item_revision,
-        );
+        let item_id = SpecificationItemId::new(artifact_type.to_string(), item_name, item_revision);
 
         let covered_id = SpecificationItemId::new(
             covered_artifact_type.to_string(),
@@ -145,19 +156,29 @@ impl TagImporter {
     }
 
     /// Parse a short tag like [[req~name~1:impl]]
-    fn parse_short_tag(&self, captures: &regex::Captures, location: &Location) -> Result<Option<SpecificationItem>> {
+    fn parse_short_tag(
+        &self,
+        captures: &regex::Captures,
+        location: &Location,
+    ) -> Result<Option<SpecificationItem>> {
         let covered_artifact_type = captures.get(1).unwrap().as_str();
         let covered_name = captures.get(2).unwrap().as_str();
         let covered_revision_str = captures.get(3).unwrap().as_str();
-        let covered_revision = covered_revision_str.parse::<u32>()
-            .map_err(|_| crate::Error::Parse {
-                message: format!("Invalid revision number: {}", covered_revision_str),
-                location: location.to_string(),
-            })?;
+        let covered_revision =
+            covered_revision_str
+                .parse::<u32>()
+                .map_err(|_| crate::Error::Parse {
+                    message: format!("Invalid revision number: {}", covered_revision_str),
+                    location: location.to_string(),
+                })?;
         let artifact_type = captures.get(4).unwrap().as_str();
 
         // Create the covering item
-        let item_name = format!("{}-{}", covered_name, self.generate_hash(&location.to_string()));
+        let item_name = format!(
+            "{}-{}",
+            covered_name,
+            self.generate_hash(&location.to_string())
+        );
         let item_id = SpecificationItemId::new(
             artifact_type.to_string(),
             item_name,
@@ -191,7 +212,7 @@ impl TagImporter {
     fn generate_hash(&self, input: &str) -> u64 {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
-        
+
         let mut hasher = DefaultHasher::new();
         input.hash(&mut hasher);
         hasher.finish()
@@ -214,18 +235,18 @@ impl Default for TagImporter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::NamedTempFile;
     use std::io::Write;
+    use tempfile::NamedTempFile;
 
     #[test]
     fn test_parse_full_tag() {
         let importer = TagImporter::new();
         let content = "// [impl->dsn~validate-authentication-request~1]";
         let temp_file = NamedTempFile::new().unwrap();
-        
+
         let items = importer.parse_line(content, temp_file.path(), 1).unwrap();
         assert_eq!(items.len(), 1);
-        
+
         let item = &items[0];
         assert_eq!(item.id.artifact_type, "impl");
         assert_eq!(item.covers.len(), 1);
@@ -239,10 +260,10 @@ mod tests {
         let importer = TagImporter::new();
         let content = "// [dsn->feat~login~1>>impl,test]";
         let temp_file = NamedTempFile::new().unwrap();
-        
+
         let items = importer.parse_line(content, temp_file.path(), 1).unwrap();
         assert_eq!(items.len(), 1);
-        
+
         let item = &items[0];
         assert_eq!(item.id.artifact_type, "dsn");
         assert_eq!(item.needs, vec!["impl", "test"]);
@@ -253,10 +274,10 @@ mod tests {
         let importer = TagImporter::new();
         let content = "// [[req~login~1:impl]]";
         let temp_file = NamedTempFile::new().unwrap();
-        
+
         let items = importer.parse_line(content, temp_file.path(), 1).unwrap();
         assert_eq!(items.len(), 1);
-        
+
         let item = &items[0];
         assert_eq!(item.id.artifact_type, "impl");
         assert_eq!(item.covers.len(), 1);
@@ -272,13 +293,16 @@ mod tests {
         writeln!(temp_file, "fn authenticate_user() {{}}").unwrap();
         writeln!(temp_file, "// [utest->dsn~authenticate-user~1]").unwrap();
         writeln!(temp_file, "#[test] fn test_authenticate() {{}}").unwrap();
-        
+
         let items = importer.import_from_file(temp_file.path()).unwrap();
         assert_eq!(items.len(), 2);
-        
+
         let impl_item = items.iter().find(|i| i.id.artifact_type == "impl").unwrap();
-        let test_item = items.iter().find(|i| i.id.artifact_type == "utest").unwrap();
-        
+        let test_item = items
+            .iter()
+            .find(|i| i.id.artifact_type == "utest")
+            .unwrap();
+
         assert_eq!(impl_item.covers[0].name, "authenticate-user");
         assert_eq!(test_item.covers[0].name, "authenticate-user");
     }
