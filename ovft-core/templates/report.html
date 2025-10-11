@@ -87,7 +87,7 @@
                         {%- endmatch -%}
                         {%- match item.item.description -%}
                             {%- when Some with (description) -%}
-                                <div class="item-description">{{ description }}</div>
+                                <div class="item-description">{{ description|safe }}</div>
                             {%- when None -%}
                         {%- endmatch -%}
                     </div>
