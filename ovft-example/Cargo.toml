@@ -1,6 +1,6 @@
 [package]
 name = "ovft-example"
-version = "0.1.0"
+version = "0.1.2"
 edition = "2021"
 authors = ["jFiedler24 <your.email@example.com>"]
 description = "Example usage of Open Very Fast Trace in build.rs"
