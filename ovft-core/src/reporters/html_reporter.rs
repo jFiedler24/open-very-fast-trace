@@ -18,6 +18,7 @@ impl HtmlReporter {
     }
 
     /// Generate an HTML report for the trace result
+    /// [impl->req~html-compliant-anchors~1]
     pub fn generate_report(&self, trace_result: &TraceResult, output_path: &Path) -> Result<()> {
         // Convert markdown descriptions to HTML
         let processed_trace_result = self.process_markdown_content(trace_result);
@@ -27,10 +28,7 @@ impl HtmlReporter {
             css: include_str!("../assets/report.css"),
         };
 
-        let mut html = template.render()?;
-        
-        // Post-process HTML to fix ID links by replacing tilde characters with underscores
-        html = self.fix_html_ids(html);
+        let html = template.render()?;
 
         // Ensure output directory exists
         if let Some(parent) = output_path.parent() {
@@ -39,14 +37,6 @@ impl HtmlReporter {
 
         fs::write(output_path, html)?;
         Ok(())
-    }
-    
-    /// Fix HTML IDs and links by replacing problematic characters
-    fn fix_html_ids(&self, html: String) -> String {
-        // Replace tilde characters in both ID attributes and href links
-        html.replace("id=\"item-", "id=\"item_")
-            .replace("href=\"#item-", "href=\"#item_")
-            .replace('~', "_")
     }
     
     /// Process markdown content in descriptions and convert to HTML
@@ -98,14 +88,6 @@ impl HtmlReporter {
         let mut html_output = String::new();
         html::push_html(&mut html_output, parser);
         html_output
-    }
-    
-    /// Create a safe HTML ID from a specification item ID by replacing problematic characters
-    fn safe_html_id(&self, id: &str) -> String {
-        id.replace('~', "_")
-          .replace(':', "_")
-          .replace(' ', "_")
-          .replace('-', "_")
     }
 }
 

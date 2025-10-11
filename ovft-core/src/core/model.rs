@@ -45,6 +45,16 @@ impl SpecificationItemId {
 
         Ok(Self::new(artifact_type, name, revision))
     }
+
+    /// Generate an HTML-safe anchor ID from this specification item ID
+    /// [impl->req~html-compliant-anchors~1]
+    pub fn to_html_id(&self) -> String {
+        format!("item_{}_{}_{}",
+            self.artifact_type.replace('-', "_"),
+            self.name.replace('~', "_").replace(':', "_").replace(' ', "_").replace('-', "_"),
+            self.revision
+        )
+    }
 }
 
 impl fmt::Display for SpecificationItemId {
@@ -349,7 +359,7 @@ pub struct Defect {
 }
 
 /// Types of defects that can be found
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum DefectType {
     /// Item lacks required coverage
     UncoveredItem,

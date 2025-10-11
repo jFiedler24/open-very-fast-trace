@@ -36,6 +36,16 @@
                     <span class="summary-value">{{ trace_result.defect_count }}</span>
                 </div>
             </div>
+            {%- if trace_result.defect_count > 0 -%}
+            <div class="defect-statistics">
+                <h3>Defect Breakdown</h3>
+                <ul class="defect-stats-list">
+                    {%- for message in trace_result.defect_statistics_messages() -%}
+                    <li class="defect-stat-item">{{ message }}</li>
+                    {%- endfor -%}
+                </ul>
+            </div>
+            {%- endif -%}
         </section>
 
         {%- if trace_result.defect_count > 0 -%}
@@ -56,7 +66,7 @@
             <h2>Specification Items</h2>
             <div class="items-grid">
                 {%- for item in trace_result.items -%}
-                <div class="spec-item" id="req-{{ loop.index0 }}">
+                <div class="spec-item" id="{{ item.item.id.to_html_id() }}" data-req-id="{{ item.item.id }}">
                     <div class="item-header">
                         <h4 class="item-id">{{ item.item.id }}</h4>
                         <div class="item-status">
@@ -149,23 +159,24 @@
     </div>
     
     <script>
+        // [impl->req~html-compliant-anchors~1]
+        // [impl->req~defect-requirement-linking~1]
         // Make requirement IDs clickable by adding hyperlinks
         document.addEventListener('DOMContentLoaded', function() {
-            // Create a map of requirement ID to anchor
+            // Create a map of requirement ID to HTML-safe anchor ID
             const requirementElements = document.querySelectorAll('.spec-item');
             const idToAnchor = new Map();
             
-            requirementElements.forEach((element, index) => {
-                const idElement = element.querySelector('.item-id');
-                if (idElement) {
-                    const reqId = idElement.textContent.trim();
-                    const anchorId = `req-${index}`;
-                    element.id = anchorId;
+            requirementElements.forEach((element) => {
+                const reqId = element.getAttribute('data-req-id');
+                if (reqId) {
+                    // HTML-safe ID is already set on the element
+                    const anchorId = element.id;
                     idToAnchor.set(reqId, anchorId);
                 }
             });
             
-            // Convert requirement text to links
+            // Convert requirement text to links in metadata sections
             const requirementLinks = document.querySelectorAll('.requirement-link');
             requirementLinks.forEach(linkElement => {
                 const reqId = linkElement.textContent.trim();
@@ -179,6 +190,21 @@
                 }
             });
             
+            // Convert requirement IDs in defect descriptions to clickable links
+            const defectDescriptions = document.querySelectorAll('.defect-description');
+            defectDescriptions.forEach(descElement => {
+                let html = descElement.innerHTML;
+                // Match requirement ID patterns like "req~name~1" or "dsn~name~2"
+                const reqIdPattern = /\b([a-z]+)~([a-zA-Z0-9-_]+)~(\d+)\b/g;
+                html = html.replace(reqIdPattern, (match) => {
+                    if (idToAnchor.has(match)) {
+                        return `<a href="#${idToAnchor.get(match)}" class="defect-req-link">${match}</a>`;
+                    }
+                    return match;
+                });
+                descElement.innerHTML = html;
+            });
+            
             // Add smooth scrolling
             document.querySelectorAll('a[href^="#"]').forEach(anchor => {
                 anchor.addEventListener('click', function (e) {
@@ -189,6 +215,11 @@
                             behavior: 'smooth',
                             block: 'center'
                         });
+                        // Highlight the target briefly
+                        target.style.backgroundColor = '#fff3cd';
+                        setTimeout(() => {
+                            target.style.backgroundColor = '';
+                        }, 2000);
                     }
                 });
             });

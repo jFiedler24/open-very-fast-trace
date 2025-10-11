@@ -1,6 +1,6 @@
 use crate::config::Config;
 use crate::core::Linker;
-use crate::core::{CoverageStatus, CoverageSummary, Defect, LinkedSpecificationItem};
+use crate::core::{CoverageStatus, CoverageSummary, Defect, DefectType, LinkedSpecificationItem};
 use crate::importers::{MarkdownImporter, TagImporter};
 use crate::Result;
 use std::collections::HashMap;
@@ -239,5 +239,40 @@ impl TraceResult {
                 .push(item);
         }
         result
+    }
+
+    /// Get defect statistics grouped by defect type
+    /// [impl->req~defect-type-statistics~1]
+    pub fn defect_statistics(&self) -> HashMap<DefectType, usize> {
+        let mut stats = HashMap::new();
+        for defect in &self.defects {
+            *stats.entry(defect.defect_type.clone()).or_insert(0) += 1;
+        }
+        stats
+    }
+
+    /// Get human-readable defect statistics
+    /// [impl->req~defect-type-statistics~1]
+    pub fn defect_statistics_messages(&self) -> Vec<String> {
+        let stats = self.defect_statistics();
+        let mut messages = Vec::new();
+
+        if let Some(&count) = stats.get(&DefectType::UncoveredItem) {
+            messages.push(format!("{} item(s) have no coverage", count));
+        }
+        if let Some(&count) = stats.get(&DefectType::OrphanedCoverage) {
+            messages.push(format!("{} item(s) have orphaned coverage", count));
+        }
+        if let Some(&count) = stats.get(&DefectType::DuplicateItem) {
+            messages.push(format!("{} duplicate item(s) found", count));
+        }
+        if let Some(&count) = stats.get(&DefectType::WrongRevision) {
+            messages.push(format!("{} item(s) cover wrong revision", count));
+        }
+        if let Some(&count) = stats.get(&DefectType::CircularDependency) {
+            messages.push(format!("{} circular dependenc(ies) detected", count));
+        }
+
+        messages
     }
 }
