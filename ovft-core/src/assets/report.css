@@ -197,6 +197,30 @@ body {
     font-weight: 500;
 }
 
+/* Link to view the defective spec item */
+.defect-item-link {
+    color: #721c24;
+    text-decoration: none;
+    font-weight: 600;
+    padding: 6px 12px;
+    border-radius: 4px;
+    background-color: rgba(220, 53, 69, 0.1);
+    border: 1px solid rgba(220, 53, 69, 0.3);
+    font-size: 0.85rem;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.defect-item-link:hover {
+    background-color: rgba(220, 53, 69, 0.2);
+    border-color: rgba(220, 53, 69, 0.5);
+    transform: translateX(3px);
+}
+
+.defect-item-link:active {
+    transform: translateX(1px);
+}
+
 .defect-link {
     color: #007bff;
     text-decoration: none;

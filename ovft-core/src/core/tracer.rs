@@ -251,26 +251,65 @@ impl TraceResult {
         stats
     }
 
-    /// Get human-readable defect statistics
+    /// Get human-readable defect statistics with detailed breakdown
     /// [impl->req~defect-type-statistics~1]
     pub fn defect_statistics_messages(&self) -> Vec<String> {
-        let stats = self.defect_statistics();
         let mut messages = Vec::new();
-
-        if let Some(&count) = stats.get(&DefectType::UncoveredItem) {
-            messages.push(format!("{} item(s) have no coverage", count));
+        
+        // Count defects by needed coverage type
+        let mut coverage_needs: HashMap<String, usize> = HashMap::new();
+        let mut orphaned_count = 0;
+        let mut duplicate_count = 0;
+        let mut wrong_revision_count = 0;
+        let mut circular_count = 0;
+        
+        for defect in &self.defects {
+            match defect.defect_type {
+                DefectType::UncoveredItem => {
+                    // Parse the description to find what coverage is needed
+                    if defect.description.contains("needs coverage by") {
+                        // Extract the coverage types from descriptions like "needs coverage by dsn" or "needs coverage by impl, test"
+                        if let Some(start) = defect.description.find("needs coverage by ") {
+                            let coverage_part = &defect.description[start + 18..];
+                            // Take until semicolon or end of string
+                            let coverage_str = coverage_part.split(';').next().unwrap_or(coverage_part).trim();
+                            
+                            // Split by comma and count each type
+                            for coverage_type in coverage_str.split(',') {
+                                let trimmed = coverage_type.trim();
+                                *coverage_needs.entry(trimmed.to_string()).or_insert(0) += 1;
+                            }
+                        }
+                    } else if defect.description.contains("covers non-existing") {
+                        orphaned_count += 1;
+                    }
+                }
+                DefectType::OrphanedCoverage => orphaned_count += 1,
+                DefectType::DuplicateItem => duplicate_count += 1,
+                DefectType::WrongRevision => wrong_revision_count += 1,
+                DefectType::CircularDependency => circular_count += 1,
+            }
         }
-        if let Some(&count) = stats.get(&DefectType::OrphanedCoverage) {
-            messages.push(format!("{} item(s) have orphaned coverage", count));
+        
+        // Generate messages for coverage needs (sorted by artifact type)
+        let mut coverage_types: Vec<_> = coverage_needs.into_iter().collect();
+        coverage_types.sort_by(|a, b| a.0.cmp(&b.0));
+        for (coverage_type, count) in coverage_types {
+            messages.push(format!("{} item(s) need coverage by {}", count, coverage_type));
         }
-        if let Some(&count) = stats.get(&DefectType::DuplicateItem) {
-            messages.push(format!("{} duplicate item(s) found", count));
+        
+        // Add other defect types
+        if orphaned_count > 0 {
+            messages.push(format!("{} item(s) have orphaned coverage", orphaned_count));
         }
-        if let Some(&count) = stats.get(&DefectType::WrongRevision) {
-            messages.push(format!("{} item(s) cover wrong revision", count));
+        if duplicate_count > 0 {
+            messages.push(format!("{} duplicate item(s) found", duplicate_count));
         }
-        if let Some(&count) = stats.get(&DefectType::CircularDependency) {
-            messages.push(format!("{} circular dependenc(ies) detected", count));
+        if wrong_revision_count > 0 {
+            messages.push(format!("{} item(s) cover wrong revision", wrong_revision_count));
+        }
+        if circular_count > 0 {
+            messages.push(format!("{} circular dependenc(ies) detected", circular_count));
         }
 
         messages

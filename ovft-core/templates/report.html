@@ -53,9 +53,14 @@
             <h2>Defects Found</h2>
             <div class="defect-list">
                 {%- for defect in trace_result.defects -%}
-                <div class="defect-item">
+                <div class="defect-item" data-defect-item-id="{%- match defect.item_id -%}{%- when Some with (id) -%}{{ id }}{%- when None -%}{%- endmatch -%}">
                     <span class="defect-type">{{ defect.defect_type }}</span>
                     <span class="defect-description">{{ defect.description }}</span>
+                    {%- match defect.item_id -%}
+                        {%- when Some with (id) -%}
+                            <a href="#{{ id.to_html_id() }}" class="defect-item-link" title="Go to {{ id }}">→ View Item</a>
+                        {%- when None -%}
+                    {%- endmatch -%}
                 </div>
                 {%- endfor -%}
             </div>
