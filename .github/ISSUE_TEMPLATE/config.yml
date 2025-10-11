@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 📖 Documentation
+    url: https://github.com/jFiedler24/open-very-fast-trace/blob/main/README.md
+    about: Check the README for usage instructions and examples
+  - name: 💬 Discussions
+    url: https://github.com/jFiedler24/open-very-fast-trace/discussions
+    about: Ask questions and discuss ideas with the community

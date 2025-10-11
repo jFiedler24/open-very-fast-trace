@@ -111,3 +111,51 @@ This document defines the detailed requirements for the Open Very Fast Trace (OV
 **Tags:** compatibility, file-formats, flexibility
 
 **Needs:** dsn
+
+---
+
+## req~html-compliant-anchors~1
+
+**Title:** Generate HTML-compliant anchor IDs without displaying them
+
+**Description:** The system shall generate HTML-compliant anchor IDs from requirement IDs for internal linking purposes while preserving the original requirement ID display in the HTML output. The anchor IDs shall replace problematic characters (like tildes) with HTML-safe alternatives (like underscores) but these transformed IDs shall not be shown to users in the rendered HTML.
+
+**Covers:** feat~html-reporting~1
+
+**Rationale:** HTML anchor IDs must be compliant with HTML standards for proper linking functionality, but users should continue to see the original, meaningful requirement IDs in the interface.
+
+**Tags:** html, anchors, usability, compliance
+
+**Needs:** dsn
+
+---
+
+## req~defect-requirement-linking~1
+
+**Title:** Provide clickable links from defects to related requirements
+
+**Description:** The system shall include clickable links in defect descriptions that navigate to the related requirement items in the HTML report. When a defect references a specific requirement ID, that ID shall be rendered as a hyperlink that scrolls to the corresponding requirement section.
+
+**Covers:** feat~html-reporting~1
+
+**Rationale:** Direct navigation from defects to requirements improves user workflow efficiency and reduces the time needed to understand and resolve traceability issues.
+
+**Tags:** navigation, defects, linking, usability
+
+**Needs:** dsn
+
+---
+
+## req~defect-type-statistics~1
+
+**Title:** Provide detailed statistics breakdown by defect type
+
+**Description:** The system shall extend the summary statistics section to include a breakdown of defects by type, showing counts for each defect category such as "X SpecItems have no coverage of utest", "Y items have orphaned coverage", etc. This shall be displayed in addition to the overall defect count.
+
+**Covers:** feat~html-reporting~1
+
+**Rationale:** Detailed defect statistics help users quickly identify the most common traceability issues and prioritize their resolution efforts effectively.
+
+**Tags:** statistics, defects, analysis, reporting
+
+**Needs:** dsn

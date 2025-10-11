@@ -1,0 +1,47 @@
+name: ❓ Question or Support
+description: Ask a question or get help using OVFT
+title: "[Question]: "
+labels: ["question", "support"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for your question! Please provide as much context as possible.
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Your Question
+      description: What would you like to know?
+      placeholder: "How do I..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: What are you trying to accomplish?
+      placeholder: "I'm trying to..."
+
+  - type: textarea
+    id: attempted
+    attributes:
+      label: What have you tried?
+      description: What solutions have you already attempted?
+      placeholder: "I tried..."
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment (if relevant)
+      placeholder: |
+        - OS: [e.g., macOS 14.0, Ubuntu 22.04, Windows 11]
+        - Rust version: [output of `rustc --version`]
+        - OVFT version: [e.g., v0.1.0]
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any other information that might help us understand your question
