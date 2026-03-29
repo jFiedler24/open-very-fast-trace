@@ -4,7 +4,6 @@
  */
 
 import * as vscode from "vscode";
-import { parse } from "smol-toml";
 
 export interface OvftConfig {
   source_dirs: string[];
@@ -34,6 +33,67 @@ const DEFAULT_CONFIG: OvftConfig = {
 };
 
 /**
+ * Minimal TOML parser for flat key = value files (strings, booleans, arrays of strings).
+ * Handles comments (#), quoted strings, and multi-line arrays with inline comments.
+ */
+function parseSimpleToml(text: string): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  // Strip comments (outside of strings) and join continuation lines
+  const lines = text.split("\n");
+  let buffer = "";
+
+  for (const raw of lines) {
+    // Remove inline comments: find # that is outside quotes
+    let line = "";
+    let inString = false;
+    for (let i = 0; i < raw.length; i++) {
+      const ch = raw[i];
+      if (ch === '"') inString = !inString;
+      if (ch === "#" && !inString) break;
+      line += ch;
+    }
+    buffer += line.trim() + " ";
+
+    // If we have an unclosed bracket, keep accumulating
+    const open = (buffer.match(/\[/g) || []).length;
+    const close = (buffer.match(/\]/g) || []).length;
+    if (open > close) continue;
+
+    const trimmed = buffer.trim();
+    buffer = "";
+    if (!trimmed || !trimmed.includes("=")) continue;
+
+    const eqIdx = trimmed.indexOf("=");
+    const key = trimmed.slice(0, eqIdx).trim();
+    const val = trimmed.slice(eqIdx + 1).trim();
+
+    if (val === "true") {
+      result[key] = true;
+    } else if (val === "false") {
+      result[key] = false;
+    } else if (val.startsWith('"') && val.endsWith('"')) {
+      result[key] = val.slice(1, -1);
+    } else if (val.startsWith("[")) {
+      // Parse array of strings
+      const inner = val.slice(1, val.lastIndexOf("]")).trim();
+      if (!inner) {
+        result[key] = [];
+      } else {
+        const items: string[] = [];
+        const re = /"([^"]*?)"/g;
+        let m;
+        while ((m = re.exec(inner)) !== null) {
+          items.push(m[1]);
+        }
+        result[key] = items;
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
  * Try to load .ovft.toml from the workspace root.
  * Returns the parsed config merged with defaults, or just defaults if no file found.
  */
@@ -49,7 +109,7 @@ export async function loadOvftConfig(): Promise<OvftConfig> {
     try {
       const bytes = await vscode.workspace.fs.readFile(configUri);
       const text = Buffer.from(bytes).toString("utf-8");
-      const parsed = parse(text);
+      const parsed = parseSimpleToml(text);
       return {
         source_dirs: asStringArray(parsed.source_dirs) ?? DEFAULT_CONFIG.source_dirs,
         spec_dirs: asStringArray(parsed.spec_dirs) ?? DEFAULT_CONFIG.spec_dirs,
