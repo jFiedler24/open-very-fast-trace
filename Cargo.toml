@@ -2,7 +2,8 @@
 members = [
     "ovft-core",
     "ovft-example",
-    "cargo-ovft"
+    "cargo-ovft",
+    "ovft-wasm"
 ]
 resolver = "2"
 

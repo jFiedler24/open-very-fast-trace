@@ -17,18 +17,23 @@ impl HtmlReporter {
         Self
     }
 
-    /// Generate an HTML report for the trace result
-    /// [impl->req~html-compliant-anchors~1]
-    pub fn generate_report(&self, trace_result: &TraceResult, output_path: &Path) -> Result<()> {
-        // Convert markdown descriptions to HTML
+    /// Render an HTML report to a String without writing to disk.
+    /// This is the pure function used by WASM and the webview.
+    pub fn render_report_html(&self, trace_result: &TraceResult) -> Result<String> {
         let processed_trace_result = self.process_markdown_content(trace_result);
-        
+
         let template = HtmlReportTemplate {
             trace_result: &processed_trace_result,
             css: include_str!("../assets/report.css"),
         };
 
-        let html = template.render()?;
+        Ok(template.render()?)
+    }
+
+    /// Generate an HTML report for the trace result
+    /// [impl->req~html-compliant-anchors~1]
+    pub fn generate_report(&self, trace_result: &TraceResult, output_path: &Path) -> Result<()> {
+        let html = self.render_report_html(trace_result)?;
 
         // Ensure output directory exists
         if let Some(parent) = output_path.parent() {

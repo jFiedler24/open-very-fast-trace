@@ -66,7 +66,7 @@ impl TagImporter {
     }
 
     /// Parse a single line for requirement tags
-    fn parse_line(
+    pub fn parse_line(
         &self,
         line: &str,
         file_path: &Path,
@@ -219,7 +219,7 @@ impl TagImporter {
     }
 
     /// Check if a file should be scanned for tags
-    fn should_scan_file(&self, path: &Path) -> bool {
+    pub fn should_scan_file(&self, path: &Path) -> bool {
         // Use default config for now, could be made configurable
         let config = Config::default();
         config.matches_source_pattern(path)

@@ -61,7 +61,7 @@ impl Tracer {
     }
 
     /// Analyze the linked items to determine coverage and defects
-    fn analyze_trace(&self, linked_items: &[LinkedSpecificationItem]) -> TraceResult {
+    pub fn analyze_trace(&self, linked_items: &[LinkedSpecificationItem]) -> TraceResult {
         let total_items = linked_items.len();
         let mut defects = Vec::new();
         let mut coverage_summary = HashMap::new();
@@ -129,7 +129,7 @@ impl Tracer {
     }
 
     /// Generate a detailed description of what's wrong with a defective item
-    fn generate_detailed_defect_description(&self, item: &LinkedSpecificationItem) -> String {
+    pub fn generate_detailed_defect_description(&self, item: &LinkedSpecificationItem) -> String {
         let mut issues = Vec::new();
 
         // Check for broken outgoing links
@@ -173,7 +173,7 @@ impl Tracer {
     }
 
     /// Find which artifact types are missing coverage for an item
-    fn find_missing_coverage_types(&self, item: &LinkedSpecificationItem) -> Vec<String> {
+    pub fn find_missing_coverage_types(&self, item: &LinkedSpecificationItem) -> Vec<String> {
         let mut missing = Vec::new();
         
         for needed_type in &item.item.needs {

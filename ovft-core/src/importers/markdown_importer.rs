@@ -88,7 +88,7 @@ impl MarkdownImporter {
     }
 
     /// Parse markdown content for specification items
-    fn parse_markdown(&self, content: &str, file_path: &Path) -> Result<Vec<SpecificationItem>> {
+    pub fn parse_markdown(&self, content: &str, file_path: &Path) -> Result<Vec<SpecificationItem>> {
         let mut items = Vec::new();
         let lines: Vec<&str> = content.lines().collect();
         let mut line_number = 0;

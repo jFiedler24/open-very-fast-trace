@@ -1,0 +1,161 @@
+{
+  "name": "ovft-tracing",
+  "displayName": "OVFT Requirement Tracing",
+  "description": "Navigate between requirement specifications and their coverage tags in source code (Open Very Fast Trace)",
+  "version": "0.1.0",
+  "publisher": "ovft",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/open-very-fast-trace"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "workspaceContains:**/*.md",
+    "workspaceContains:**/*.rs"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "ovft.followRequirement",
+        "title": "OVFT: Follow Requirement"
+      },
+      {
+        "command": "ovft.findCoverage",
+        "title": "OVFT: Find Coverage Tags"
+      },
+      {
+        "command": "ovft.transitiveFollowUp",
+        "title": "OVFT: Transitive Follow (Up — Covers)"
+      },
+      {
+        "command": "ovft.transitiveFollowDown",
+        "title": "OVFT: Transitive Follow (Down — Covered-by)"
+      },
+      {
+        "command": "ovft.showTraceReport",
+        "title": "OVFT: Show Trace Report"
+      },
+      {
+        "command": "ovft.refreshIndex",
+        "title": "OVFT: Refresh Requirement Index"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "ovft.followRequirement",
+          "group": "navigation@100",
+          "when": "editorTextFocus"
+        },
+        {
+          "command": "ovft.findCoverage",
+          "group": "navigation@101",
+          "when": "editorTextFocus"
+        },
+        {
+          "command": "ovft.transitiveFollowUp",
+          "group": "navigation@102",
+          "when": "editorTextFocus"
+        },
+        {
+          "command": "ovft.transitiveFollowDown",
+          "group": "navigation@103",
+          "when": "editorTextFocus"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "ovft.followRequirement",
+        "key": "ctrl+shift+r",
+        "mac": "cmd+shift+r",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "ovft.findCoverage",
+        "key": "ctrl+shift+t",
+        "mac": "cmd+shift+t",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "ovft.transitiveFollowUp",
+        "key": "ctrl+shift+u",
+        "mac": "cmd+shift+u",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "ovft.transitiveFollowDown",
+        "key": "ctrl+shift+d",
+        "mac": "cmd+shift+d",
+        "when": "editorTextFocus"
+      }
+    ],
+    "configuration": {
+      "title": "OVFT Requirement Tracing",
+      "properties": {
+        "ovft.specFilePatterns": {
+          "type": "array",
+          "default": [
+            "**/*.md"
+          ],
+          "description": "Glob patterns for requirement specification files (markdown)"
+        },
+        "ovft.tagFilePatterns": {
+          "type": "array",
+          "default": [
+            "**/*.rs",
+            "**/*.java",
+            "**/*.c",
+            "**/*.cpp",
+            "**/*.h",
+            "**/*.hpp",
+            "**/*.py",
+            "**/*.js",
+            "**/*.ts",
+            "**/*.go",
+            "**/*.rb",
+            "**/*.php",
+            "**/*.sh",
+            "**/*.sql"
+          ],
+          "description": "Glob patterns for source files to scan for requirement tags"
+        },
+        "ovft.excludePatterns": {
+          "type": "array",
+          "default": [
+            "**/target/**",
+            "**/node_modules/**",
+            "**/.git/**",
+            "**/out/**",
+            "**/dist/**"
+          ],
+          "description": "Glob patterns for files/directories to exclude"
+        },
+        "ovft.codeLensEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show CodeLens annotations above requirement IDs and tags"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.7.1",
+    "typescript": "^5.3.0"
+  }
+}
