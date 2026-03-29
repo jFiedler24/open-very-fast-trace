@@ -81,6 +81,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // Update diagnostics whenever the trace result changes
   traceEngine.onDidUpdate((result) => {
     diagnostics.update(result);
+    // Auto-refresh the report webview if it's open
+    if (reportPanel) {
+      refreshReportPanel();
+    }
   });
 
   // Status bar item

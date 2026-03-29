@@ -40,7 +40,8 @@
       },
       {
         "command": "ovft.showTraceReport",
-        "title": "OVFT: Show Trace Report"
+        "title": "OVFT: Show Trace Report",
+        "icon": "$(graph)"
       },
       {
         "command": "ovft.refreshIndex",
@@ -68,6 +69,18 @@
           "command": "ovft.transitiveFollowDown",
           "group": "navigation@103",
           "when": "editorTextFocus"
+        },
+        {
+          "command": "ovft.showTraceReport",
+          "group": "navigation@104",
+          "when": "editorTextFocus"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "ovft.showTraceReport",
+          "group": "navigation",
+          "when": "resourceExtname == .md || resourceExtname == .rs"
         }
       ]
     },
@@ -95,6 +108,11 @@
         "key": "ctrl+shift+d",
         "mac": "cmd+shift+d",
         "when": "editorTextFocus"
+      },
+      {
+        "command": "ovft.showTraceReport",
+        "key": "ctrl+shift+h",
+        "mac": "cmd+shift+h"
       }
     ],
     "configuration": {
