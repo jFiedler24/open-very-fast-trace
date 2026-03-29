@@ -157,5 +157,8 @@
     "@types/vscode": "^1.85.0",
     "@vscode/vsce": "^3.7.1",
     "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "smol-toml": "^1.6.1"
   }
 }

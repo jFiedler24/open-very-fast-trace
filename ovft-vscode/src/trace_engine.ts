@@ -8,6 +8,7 @@
  */
 
 import * as vscode from "vscode";
+import { loadOvftConfig, buildSourceGlobs, buildSpecGlobs, buildExcludeGlob } from "./config_loader";
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const wasm = require("../pkg/ovft_wasm");
@@ -80,23 +81,16 @@ export class TraceEngine {
 
   /**
    * Collect all spec and source file contents from the workspace,
-   * respecting user-configured patterns and exclusions.
+   * using .ovft.toml config if present, falling back to VS Code settings.
    */
   private async collectFiles(): Promise<{
     specFiles: { path: string; content: string }[];
     sourceFiles: { path: string; content: string }[];
   }> {
-    const config = vscode.workspace.getConfiguration("ovft");
-    const specPatterns: string[] = config.get("specFilePatterns", ["**/*.md"]);
-    const tagPatterns: string[] = config.get("tagFilePatterns", [
-      "**/*.rs", "**/*.java", "**/*.c", "**/*.cpp", "**/*.h", "**/*.hpp",
-      "**/*.py", "**/*.js", "**/*.ts", "**/*.go", "**/*.rb", "**/*.php",
-      "**/*.sh", "**/*.sql",
-    ]);
-    const excludePatterns: string[] = config.get("excludePatterns", [
-      "**/target/**", "**/node_modules/**", "**/.git/**", "**/out/**", "**/dist/**",
-    ]);
-    const exclude = `{${excludePatterns.join(",")}}`;
+    const ovftConfig = await loadOvftConfig();
+    const specPatterns = buildSpecGlobs(ovftConfig);
+    const tagPatterns = buildSourceGlobs(ovftConfig);
+    const exclude = buildExcludeGlob(ovftConfig);
 
     const specFiles: { path: string; content: string }[] = [];
     const sourceFiles: { path: string; content: string }[] = [];
