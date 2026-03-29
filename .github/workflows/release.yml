@@ -136,6 +136,42 @@ jobs:
         asset_name: cargo-ovft-${{ github.ref_name }}-${{ matrix.target }}.zip
         asset_content_type: application/zip
 
+  vscode-extension:
+    name: Build and Upload VS Code Extension
+    runs-on: ubuntu-latest
+    needs: create-release
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install dependencies
+      working-directory: ovft-vscode
+      run: npm ci
+
+    - name: Compile extension
+      working-directory: ovft-vscode
+      run: npm run compile
+
+    - name: Package VSIX
+      working-directory: ovft-vscode
+      run: npx vsce package --out ovft-tracing-${{ github.ref_name }}.vsix
+
+    - name: Upload VSIX as release asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.create-release.outputs.upload_url }}
+        asset_path: ovft-vscode/ovft-tracing-${{ github.ref_name }}.vsix
+        asset_name: ovft-tracing-${{ github.ref_name }}.vsix
+        asset_content_type: application/octet-stream
+
   publish-crates:
     name: Publish to crates.io
     runs-on: ubuntu-latest
