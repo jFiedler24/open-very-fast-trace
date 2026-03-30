@@ -2,7 +2,7 @@
   "name": "ovft-tracing",
   "displayName": "OVFT Requirement Tracing",
   "description": "Navigate between requirement specifications and their coverage tags in source code (Open Very Fast Trace)",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "publisher": "ovft",
   "license": "MIT",
   "repository": {
@@ -21,6 +21,23 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "ovft-tracing",
+          "title": "OVFT Tracing",
+          "icon": "$(checklist)"
+        }
+      ]
+    },
+    "views": {
+      "ovft-tracing": [
+        {
+          "id": "ovftRequirementTree",
+          "name": "Requirements"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "ovft.followRequirement",
@@ -45,7 +62,8 @@
       },
       {
         "command": "ovft.refreshIndex",
-        "title": "OVFT: Refresh Requirement Index"
+        "title": "OVFT: Refresh Requirement Index",
+        "icon": "$(refresh)"
       }
     ],
     "menus": {
@@ -76,11 +94,16 @@
           "when": "editorTextFocus"
         }
       ],
-      "editor/title": [
+      "view/title": [
         {
           "command": "ovft.showTraceReport",
           "group": "navigation",
-          "when": "resourceExtname == .md || resourceExtname == .rs"
+          "when": "view == ovftRequirementTree"
+        },
+        {
+          "command": "ovft.refreshIndex",
+          "group": "navigation",
+          "when": "view == ovftRequirementTree"
         }
       ]
     },

@@ -31,6 +31,7 @@ import {
 } from "./providers";
 import { TraceEngine, TraceLinkedItem } from "./trace_engine";
 import { OvftDiagnosticsProvider } from "./diagnostics";
+import { RequirementTreeProvider } from "./tree_provider";
 
 // All file types we operate on — we register broadly but our providers
 // return undefined when the cursor isn't on a requirement, so they
@@ -125,7 +126,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.languages.registerReferenceProvider(ALL_LANGUAGES, new OvftReferenceProvider(index)),
     vscode.languages.registerCodeLensProvider(ALL_LANGUAGES, new OvftCodeLensProvider(index)),
     vscode.languages.registerDocumentHighlightProvider(ALL_LANGUAGES, new OvftDocumentHighlightProvider(index)),
-    vscode.languages.registerHoverProvider(ALL_LANGUAGES, new OvftHoverProvider(index))
+    vscode.languages.registerHoverProvider(ALL_LANGUAGES, new OvftHoverProvider(index, traceEngine))
+  );
+
+  // Register requirement tree view in the sidebar
+  const treeProvider = new RequirementTreeProvider(traceEngine);
+  context.subscriptions.push(
+    vscode.window.createTreeView("ovftRequirementTree", {
+      treeDataProvider: treeProvider,
+      showCollapseAll: true,
+    })
   );
 
   // -----------------------------------------------------------------------

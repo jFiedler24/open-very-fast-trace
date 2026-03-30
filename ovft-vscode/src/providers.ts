@@ -18,6 +18,7 @@ import {
   SpecLocation,
   TagLocation,
 } from "./index";
+import type { TraceEngine } from "./trace_engine";
 
 // ---------------------------------------------------------------------------
 // Definition provider  —  from tag → go to spec, from spec → go to spec
@@ -213,7 +214,7 @@ export class OvftDocumentHighlightProvider implements vscode.DocumentHighlightPr
 // ---------------------------------------------------------------------------
 
 export class OvftHoverProvider implements vscode.HoverProvider {
-  constructor(private index: RequirementIndex) {}
+  constructor(private index: RequirementIndex, private traceEngine: TraceEngine) {}
 
   provideHover(
     document: vscode.TextDocument,
@@ -226,12 +227,21 @@ export class OvftHoverProvider implements vscode.HoverProvider {
     const idStr = reqIdToString(detected.id);
     const specs = this.index.findSpec(detected.id);
     const tags = this.index.findCoverageTags(detected.id);
+    const traceItem = this.traceEngine.findItem(idStr);
 
     const md = new vscode.MarkdownString();
     md.isTrusted = true;
     md.supportThemeIcons = true;
 
     md.appendMarkdown(`**OVFT Requirement: \`${idStr}\`**\n\n`);
+
+    // Show title and description from the trace result
+    if (traceItem?.title) {
+      md.appendMarkdown(`### ${traceItem.title}\n\n`);
+    }
+    if (traceItem?.description) {
+      md.appendMarkdown(`${traceItem.description}\n\n`);
+    }
 
     if (specs.length > 0) {
       md.appendMarkdown(`**Defined in:**\n`);
