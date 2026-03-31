@@ -12,7 +12,7 @@ This document defines the high-level features for the Open Very Fast Trace (OVFT
 
 **Tags:** parsing, source-code, traceability
 
-**Needs:** req, dsn
+**Needs:** req
 
 ---
 
@@ -26,7 +26,7 @@ This document defines the high-level features for the Open Very Fast Trace (OVFT
 
 **Tags:** parsing, markdown, documentation
 
-**Needs:** req, dsn
+**Needs:** req
 
 ---
 
@@ -40,7 +40,7 @@ This document defines the high-level features for the Open Very Fast Trace (OVFT
 
 **Tags:** linking, coverage, analysis
 
-**Needs:** req, dsn
+**Needs:** req
 
 ---
 
@@ -54,7 +54,7 @@ This document defines the high-level features for the Open Very Fast Trace (OVFT
 
 **Tags:** reporting, html, visualization
 
-**Needs:** req, dsn
+**Needs:** req
 
 ---
 
@@ -68,7 +68,7 @@ This document defines the high-level features for the Open Very Fast Trace (OVFT
 
 **Tags:** integration, build, automation
 
-**Needs:** req, dsn
+**Needs:** req
 
 ---
 
@@ -82,4 +82,4 @@ This document defines the high-level features for the Open Very Fast Trace (OVFT
 
 **Tags:** error-handling, usability
 
-**Needs:** req, dsn
+**Needs:** req

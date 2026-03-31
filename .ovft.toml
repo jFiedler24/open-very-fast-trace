@@ -2,10 +2,10 @@
 # This file configures the requirements traceability analysis
 
 # Directories containing source code files to scan for tags
-source_dirs = ["src", "ovft-core/src", "cargo-ovft/src"]
+source_dirs = ["src", "ovft-core/src", "cargo-ovft/src", "docs"]
 
 # Directories containing specification files (markdown)
-spec_dirs = ["docs", "docs/requirements"]
+spec_dirs = ["docs/requirements"]
 
 # File patterns to include when scanning source directories
 source_patterns = [
@@ -47,6 +47,7 @@ artifact_types = [
     "dsn",       # Design
     "impl",      # Implementation
     "utest",     # Unit tests
+    "val",       # Validation test requirements
     "itest",     # Integration tests
     "stest",     # System tests
     "uman",      # User manual

@@ -111,3 +111,51 @@ This document defines the design specifications for the Open Very Fast Trace (OV
 **Tags:** architecture, data-models, core
 
 **Needs:** impl
+
+---
+
+## dsn~html-anchor-generation~1
+
+**Title:** HTML-compliant anchor ID generation
+
+**Description:** The system shall generate HTML-compliant anchor IDs from requirement IDs by replacing non-standard characters (e.g., tildes) with HTML-safe alternatives, while displaying the original ID to users.
+
+**Covers:** req~html-compliant-anchors~1
+
+**Rationale:** Valid HTML anchor IDs ensure reliable in-page navigation without confusing users with transformed identifiers.
+
+**Tags:** architecture, html, anchors
+
+**Needs:** impl
+
+---
+
+## dsn~defect-linking~1
+
+**Title:** Clickable links from defects to requirements
+
+**Description:** The system shall render requirement IDs in defect descriptions as clickable hyperlinks that scroll to the corresponding requirement section in the HTML report.
+
+**Covers:** req~defect-requirement-linking~1
+
+**Rationale:** Direct navigation from defects to requirements streamlines the defect resolution workflow.
+
+**Tags:** architecture, navigation, defects
+
+**Needs:** impl
+
+---
+
+## dsn~defect-statistics-breakdown~1
+
+**Title:** Defect type statistics in report summary
+
+**Description:** The system shall generate a statistics breakdown by defect type in the report summary, showing counts per defect category alongside the total defect count.
+
+**Covers:** req~defect-type-statistics~1
+
+**Rationale:** Per-category defect counts help users prioritize which tracing issues to address first.
+
+**Tags:** architecture, statistics, reporting
+
+**Needs:** impl
