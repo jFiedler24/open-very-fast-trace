@@ -60,8 +60,9 @@ impl Linker {
         // Process outgoing links for each item
         for item in linked_items.iter_mut() {
             let covers = item.item.covers.clone();
+            let covering_artifact_type = item.item.id.artifact_type.clone();
             for covered_id in &covers {
-                let link_status = self.determine_link_status(covered_id, items_by_id);
+                let link_status = self.determine_link_status(&covering_artifact_type, covered_id, items_by_id);
                 item.add_outgoing_link(covered_id.clone(), link_status);
             }
         }
@@ -84,13 +85,16 @@ impl Linker {
     /// Determine the status of an outgoing link
     fn determine_link_status(
         &self,
+        covering_artifact_type: &str,
         covered_id: &SpecificationItemId,
         items_by_id: &HashMap<SpecificationItemId, SpecificationItem>,
     ) -> LinkStatus {
         match items_by_id.get(covered_id) {
             Some(covered_item) => {
-                // Check if coverage is requested
-                if covered_item.needs.is_empty() {
+                // Check if coverage is requested for this specific artifact type
+                if covered_item.needs.is_empty()
+                    || !covered_item.needs.contains(&covering_artifact_type.to_string())
+                {
                     LinkStatus::Unwanted
                 } else {
                     LinkStatus::Covers
