@@ -1,6 +1,6 @@
 [package]
 name = "cargo-ovft"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2021"
 authors = ["jFiedler24 <your.email@example.com>"]
 description = "A Cargo plugin for Open Very Fast Trace - requirements traceability for Rust projects"
@@ -14,7 +14,7 @@ name = "cargo-ovft"
 path = "src/main.rs"
 
 [dependencies]
-ovft-core = { path = "../ovft-core", version = "0.1.2"}
+ovft-core = { path = "../ovft-core", version = "0.1.3"}
 clap = { workspace = true, features = ["derive"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
