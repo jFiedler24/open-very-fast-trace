@@ -175,8 +175,12 @@ impl Tracer {
     /// Find which artifact types are missing coverage for an item
     pub fn find_missing_coverage_types(&self, item: &LinkedSpecificationItem) -> Vec<String> {
         let mut missing = Vec::new();
+        let mut seen = std::collections::HashSet::new();
         
         for needed_type in &item.item.needs {
+            if !seen.insert(needed_type.clone()) {
+                continue; // skip duplicates
+            }
             // Check if this artifact type has any incoming coverage
             let has_coverage = item.incoming_links.iter().any(|link| {
                 if let Some(source_id) = &link.source_id {

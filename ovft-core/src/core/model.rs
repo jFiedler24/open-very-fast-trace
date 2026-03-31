@@ -250,7 +250,9 @@ impl SpecificationItemBuilder {
         self
     }
 
-    pub fn build(self) -> SpecificationItem {
+    pub fn build(mut self) -> SpecificationItem {
+        self.item.needs.sort();
+        self.item.needs.dedup();
         self.item
     }
 }

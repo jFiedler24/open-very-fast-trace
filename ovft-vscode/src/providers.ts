@@ -14,6 +14,7 @@ import {
   detectAtPosition,
   detectAllOnLine,
   reqIdToString,
+  parseReqId,
   RequirementId,
   SpecLocation,
   TagLocation,
@@ -99,7 +100,7 @@ export class OvftCodeLensProvider implements vscode.CodeLensProvider {
   private _onDidChange = new vscode.EventEmitter<void>();
   readonly onDidChangeCodeLenses = this._onDidChange.event;
 
-  constructor(private index: RequirementIndex) {
+  constructor(private index: RequirementIndex, private traceEngine: TraceEngine) {
     index.onDidUpdate(() => this._onDidChange.fire());
   }
 
@@ -138,22 +139,58 @@ export class OvftCodeLensProvider implements vscode.CodeLensProvider {
             );
           }
         } else {
-          // On a spec ID: show coverage summary
-          const coveredCount = tags.length;
+          // On a spec ID: show coverage summary using trace engine data
+          const traceItem = this.traceEngine.findItem(idStr);
           const needsList = specs.flatMap((s) => s.needs);
           const uniqueNeeds = [...new Set(needsList)];
-          const coveredTypes = [...new Set(tags.map((t) => t.coveringType))];
-          const missingTypes = uniqueNeeds.filter((n) => !coveredTypes.includes(n));
+
+          // Collect coverage from both source tags AND spec-to-spec (Covers:) links
+          const tagCoveringTypes = [...new Set(tags.map((t) => t.coveringType))];
+          const specCoveringTypes: string[] = [];
+          if (traceItem) {
+            for (const link of traceItem.incoming_links) {
+              if (link.source_id) {
+                const parsed = parseReqId(link.source_id);
+                if (parsed && !tagCoveringTypes.includes(parsed.artifactType)) {
+                  specCoveringTypes.push(parsed.artifactType);
+                }
+              }
+            }
+          }
+          const allCoveringTypes = [...new Set([...tagCoveringTypes, ...specCoveringTypes])];
+          const missingTypes = uniqueNeeds.filter((n) => !allCoveringTypes.includes(n));
+          const totalCoverageCount = tags.length + (traceItem ? traceItem.incoming_links.filter((l) => {
+            if (!l.source_id) return false;
+            const p = parseReqId(l.source_id);
+            return p && !tags.some((t) => t.coveringId && reqIdToString(t.coveringId) === l.source_id);
+          }).length : 0);
+
+          // Use trace engine's authoritative coverage status when available
+          const coverageStatus = traceItem?.coverage_status;
 
           let title: string;
-          if (coveredCount === 0 && uniqueNeeds.length > 0) {
-            title = `⚠ ${idStr} — 0 coverage tags (needs: ${uniqueNeeds.join(", ")})`;
-          } else if (missingTypes.length > 0) {
-            title = `◐ ${idStr} — ${coveredCount} tag${coveredCount !== 1 ? "s" : ""}, missing: ${missingTypes.join(", ")}`;
-          } else if (coveredCount > 0) {
-            title = `✓ ${idStr} — ${coveredCount} coverage tag${coveredCount !== 1 ? "s" : ""}`;
+          if (coverageStatus === "covered") {
+            // Build a summary of what's providing coverage
+            const parts: string[] = [];
+            if (tags.length > 0) {
+              parts.push(`${tags.length} tag${tags.length !== 1 ? "s" : ""}`);
+            }
+            if (specCoveringTypes.length > 0) {
+              parts.push(`${specCoveringTypes.length} spec${specCoveringTypes.length !== 1 ? "s" : ""}`);
+            }
+            title = `✓ ${idStr} — covered (${parts.join(", ")})`;
+          } else if (coverageStatus === "partial" || missingTypes.length > 0) {
+            const parts: string[] = [];
+            if (tags.length > 0) parts.push(`${tags.length} tag${tags.length !== 1 ? "s" : ""}`);
+            if (specCoveringTypes.length > 0) parts.push(`${specCoveringTypes.length} spec${specCoveringTypes.length !== 1 ? "s" : ""}`);
+            const covPart = parts.length > 0 ? ` (${parts.join(", ")})` : "";
+            title = `◐ ${idStr} — partial${covPart}, missing: ${missingTypes.join(", ")}`;
+          } else if (uniqueNeeds.length > 0 && totalCoverageCount === 0) {
+            title = `⚠ ${idStr} — uncovered (needs: ${uniqueNeeds.join(", ")})`;
+          } else if (totalCoverageCount > 0) {
+            title = `✓ ${idStr} — ${totalCoverageCount} coverage link${totalCoverageCount !== 1 ? "s" : ""}`;
           } else {
-            title = `${idStr} — ${coveredCount} coverage tag${coveredCount !== 1 ? "s" : ""}`;
+            title = `${idStr}`;
           }
 
           lenses.push(

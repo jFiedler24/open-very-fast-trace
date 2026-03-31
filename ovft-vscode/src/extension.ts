@@ -124,7 +124,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   context.subscriptions.push(
     vscode.languages.registerDefinitionProvider(ALL_LANGUAGES, new OvftDefinitionProvider(index)),
     vscode.languages.registerReferenceProvider(ALL_LANGUAGES, new OvftReferenceProvider(index)),
-    vscode.languages.registerCodeLensProvider(ALL_LANGUAGES, new OvftCodeLensProvider(index)),
+    vscode.languages.registerCodeLensProvider(ALL_LANGUAGES, new OvftCodeLensProvider(index, traceEngine)),
     vscode.languages.registerDocumentHighlightProvider(ALL_LANGUAGES, new OvftDocumentHighlightProvider(index)),
     vscode.languages.registerHoverProvider(ALL_LANGUAGES, new OvftHoverProvider(index, traceEngine))
   );
