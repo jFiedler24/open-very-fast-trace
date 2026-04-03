@@ -104,7 +104,16 @@
                         {%- if !item.item.needs.is_empty() -%}
                         <div class="metadata-row">
                             <span class="metadata-label">Needs:</span>
-                            <span class="metadata-value">{{ item.item.needs|join(", ") }}</span>
+                            <span class="metadata-value">
+                                {%- for need_type in item.item.needs -%}
+                                    {%- if item.is_need_covered(need_type) -%}
+                                        <span class="needs-covered" data-item-id="{{ item.item.id }}" data-need-type="{{ need_type }}">{{ need_type }}</span>
+                                    {%- else -%}
+                                        <span class="needs-uncovered" title="⚠ No {{ need_type }} coverage for {{ item.item.id }}">{{ need_type }} ⚠</span>
+                                    {%- endif -%}
+                                    {%- if !loop.last -%}, {%- endif -%}
+                                {%- endfor -%}
+                            </span>
                         </div>
                         {%- endif -%}
                         {%- if !item.item.covers.is_empty() -%}
@@ -210,6 +219,65 @@
                 descElement.innerHTML = html;
             });
             
+            // Convert covered needs types into hyperlinks to covering items
+            const needsCoveredSpans = document.querySelectorAll('.needs-covered');
+            needsCoveredSpans.forEach(span => {
+                const itemId = span.getAttribute('data-item-id');
+                const needType = span.getAttribute('data-need-type');
+                const itemElement = document.querySelector(`.spec-item[data-req-id="${itemId}"]`);
+                if (!itemElement) return;
+
+                // Find the incoming links row for this item
+                const incomingRow = itemElement.querySelector('.metadata-row .metadata-label');
+                if (!incomingRow) return;
+
+                // Find covering items by looking at incoming links whose source matches the need type
+                const incomingLinks = itemElement.querySelectorAll('.link-covered');
+                // Build list of covering item IDs by matching artifact type against need type
+                const coveringIds = [];
+                const allLinks = itemElement.querySelectorAll('.requirement-link');
+                // Also search all spec items for items whose artifact type matches
+                requirementElements.forEach(el => {
+                    const rid = el.getAttribute('data-req-id');
+                    if (!rid) return;
+                    // Check if this item's artifact type matches the need type
+                    const parts = rid.split('~');
+                    if (parts[0] === needType) {
+                        // Check if this item covers our item (has outgoing link to it)
+                        const outgoingLinks = el.querySelectorAll('.metadata-row');
+                        outgoingLinks.forEach(row => {
+                            const label = row.querySelector('.metadata-label');
+                            if (label && label.textContent.trim() === 'Outgoing Links:') {
+                                const links = row.querySelectorAll('.requirement-link');
+                                links.forEach(link => {
+                                    if (link.textContent.trim() === itemId) {
+                                        coveringIds.push({ id: rid, anchor: el.id });
+                                    }
+                                });
+                            }
+                        });
+                    }
+                });
+
+                if (coveringIds.length === 1) {
+                    // Single covering item — make a direct link
+                    const anchor = document.createElement('a');
+                    anchor.href = '#' + coveringIds[0].anchor;
+                    anchor.className = span.className;
+                    anchor.textContent = span.textContent;
+                    anchor.title = 'Go to ' + coveringIds[0].id;
+                    span.parentNode.replaceChild(anchor, span);
+                } else if (coveringIds.length > 1) {
+                    // Multiple covering items — link to the first, show count in title
+                    const anchor = document.createElement('a');
+                    anchor.href = '#' + coveringIds[0].anchor;
+                    anchor.className = span.className;
+                    anchor.textContent = span.textContent;
+                    anchor.title = 'Covered by: ' + coveringIds.map(c => c.id).join(', ');
+                    span.parentNode.replaceChild(anchor, span);
+                }
+            });
+
             // Add smooth scrolling
             document.querySelectorAll('a[href^="#"]').forEach(anchor => {
                 anchor.addEventListener('click', function (e) {

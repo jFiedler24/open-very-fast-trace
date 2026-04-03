@@ -192,7 +192,14 @@ impl MarkdownImporter {
             let line = lines[*line_number];
 
             // Check if we've reached another specification item
-            if self.id_regex.is_match(line) {
+            // But don't break if we're in a Covers/Depends section and this is a bullet list item
+            // (backtick IDs in cover bullets like `  * `req~name~1`` are references, not new items)
+            let is_bullet = line.trim().starts_with('-')
+                || line.trim().starts_with('*')
+                || line.trim().starts_with('+');
+            let in_list_section = matches!(current_section, Section::Covers | Section::Depends);
+
+            if self.id_regex.is_match(line) && !(in_list_section && is_bullet) {
                 *line_number -= 1; // Back up so the outer loop can process this
                 break;
             }

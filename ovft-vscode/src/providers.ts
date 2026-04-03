@@ -319,6 +319,184 @@ export class OvftHoverProvider implements vscode.HoverProvider {
 }
 
 // ---------------------------------------------------------------------------
+// Needs coverage link provider — makes needs types clickable hyperlinks
+// ---------------------------------------------------------------------------
+
+const NEEDS_LINE_RE = /^(\*?\*?Needs:\*?\*?)\s*(.+)$/i;
+const SPEC_ID_LINE_RE = /`([a-zA-Z]+)~([a-zA-Z0-9._-]+)~(\d+)`/;
+
+export class OvftNeedsLinkProvider implements vscode.DocumentLinkProvider {
+  constructor(private traceEngine: TraceEngine) {}
+
+  provideDocumentLinks(
+    document: vscode.TextDocument,
+    _token: vscode.CancellationToken
+  ): vscode.DocumentLink[] {
+    if (!/\.(md|markdown)$/i.test(document.fileName)) return [];
+
+    const links: vscode.DocumentLink[] = [];
+    let currentSpecId: string | undefined;
+
+    for (let i = 0; i < document.lineCount; i++) {
+      const lineText = document.lineAt(i).text;
+
+      const specMatch = SPEC_ID_LINE_RE.exec(lineText);
+      if (specMatch) {
+        currentSpecId = `${specMatch[1]}~${specMatch[2]}~${specMatch[3]}`;
+      }
+
+      const needsMatch = NEEDS_LINE_RE.exec(lineText);
+      if (needsMatch && currentSpecId) {
+        const needsStr = needsMatch[2];
+        const needTypes = needsStr.split(/,\s*/);
+        let searchFrom = lineText.indexOf(needsStr);
+
+        for (const needType of needTypes) {
+          const trimmed = needType.trim();
+          if (!trimmed) continue;
+
+          const typeStart = lineText.indexOf(trimmed, searchFrom);
+          if (typeStart < 0) continue;
+          const typeEnd = typeStart + trimmed.length;
+
+          const range = new vscode.Range(i, typeStart, i, typeEnd);
+          const args = encodeURIComponent(
+            JSON.stringify([currentSpecId, trimmed])
+          );
+          const commandUri = vscode.Uri.parse(
+            `command:ovft.navigateNeedCoverage?${args}`
+          );
+
+          const link = new vscode.DocumentLink(range, commandUri);
+          link.tooltip = `Navigate to ${trimmed} coverage for ${currentSpecId}`;
+          links.push(link);
+
+          searchFrom = typeEnd;
+        }
+      }
+    }
+
+    return links;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Needs decoration manager — visual indicators for covered/uncovered needs
+// ---------------------------------------------------------------------------
+
+export class OvftNeedsDecorationManager implements vscode.Disposable {
+  private coveredType: vscode.TextEditorDecorationType;
+  private uncoveredType: vscode.TextEditorDecorationType;
+  private disposables: vscode.Disposable[] = [];
+
+  constructor(private traceEngine: TraceEngine) {
+    this.coveredType = vscode.window.createTextEditorDecorationType({
+      color: new vscode.ThemeColor("testing.iconPassed"),
+      textDecoration: "underline",
+    });
+    this.uncoveredType = vscode.window.createTextEditorDecorationType({
+      color: new vscode.ThemeColor("editorWarning.foreground"),
+      textDecoration: "underline wavy",
+      after: {
+        contentText: " ⚠",
+        color: new vscode.ThemeColor("editorWarning.foreground"),
+      },
+    });
+
+    this.disposables.push(
+      vscode.window.onDidChangeActiveTextEditor((editor) => {
+        if (editor) this.updateDecorations(editor);
+      }),
+      vscode.window.onDidChangeVisibleTextEditors((editors) => {
+        for (const editor of editors) this.updateDecorations(editor);
+      }),
+      traceEngine.onDidUpdate(() => {
+        for (const editor of vscode.window.visibleTextEditors) {
+          this.updateDecorations(editor);
+        }
+      })
+    );
+  }
+
+  /** Trigger decoration refresh on all visible editors. */
+  refresh(): void {
+    for (const editor of vscode.window.visibleTextEditors) {
+      this.updateDecorations(editor);
+    }
+  }
+
+  private updateDecorations(editor: vscode.TextEditor): void {
+    if (!/\.(md|markdown)$/i.test(editor.document.fileName)) {
+      editor.setDecorations(this.coveredType, []);
+      editor.setDecorations(this.uncoveredType, []);
+      return;
+    }
+
+    const coveredRanges: vscode.DecorationOptions[] = [];
+    const uncoveredRanges: vscode.DecorationOptions[] = [];
+
+    let currentSpecId: string | undefined;
+
+    for (let i = 0; i < editor.document.lineCount; i++) {
+      const lineText = editor.document.lineAt(i).text;
+
+      const specMatch = SPEC_ID_LINE_RE.exec(lineText);
+      if (specMatch) {
+        currentSpecId = `${specMatch[1]}~${specMatch[2]}~${specMatch[3]}`;
+      }
+
+      const needsMatch = NEEDS_LINE_RE.exec(lineText);
+      if (needsMatch && currentSpecId) {
+        const traceItem = this.traceEngine.findItem(currentSpecId);
+        const incomingTypes = new Set<string>();
+        if (traceItem) {
+          for (const link of traceItem.incoming_links) {
+            if (link.source_id) {
+              const parsed = parseReqId(link.source_id);
+              if (parsed) incomingTypes.add(parsed.artifactType);
+            }
+          }
+        }
+
+        const needsStr = needsMatch[2];
+        const needTypes = needsStr.split(/,\s*/);
+        let searchFrom = lineText.indexOf(needsStr);
+
+        for (const needType of needTypes) {
+          const trimmed = needType.trim();
+          if (!trimmed) continue;
+
+          const typeStart = lineText.indexOf(trimmed, searchFrom);
+          if (typeStart < 0) continue;
+          const typeEnd = typeStart + trimmed.length;
+
+          const range = new vscode.Range(i, typeStart, i, typeEnd);
+          if (incomingTypes.has(trimmed)) {
+            coveredRanges.push({ range });
+          } else {
+            uncoveredRanges.push({
+              range,
+              hoverMessage: `⚠ ${trimmed} coverage missing for ${currentSpecId}`,
+            });
+          }
+
+          searchFrom = typeEnd;
+        }
+      }
+    }
+
+    editor.setDecorations(this.coveredType, coveredRanges);
+    editor.setDecorations(this.uncoveredType, uncoveredRanges);
+  }
+
+  dispose(): void {
+    this.coveredType.dispose();
+    this.uncoveredType.dispose();
+    this.disposables.forEach((d) => d.dispose());
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Helper: build quick-pick items for navigation
 // ---------------------------------------------------------------------------
 

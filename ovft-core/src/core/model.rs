@@ -443,6 +443,27 @@ impl LinkedSpecificationItem {
             status,
         });
     }
+
+    /// Check if a specific needs type is covered by an incoming link.
+    pub fn is_need_covered(&self, need_type: &str) -> bool {
+        self.incoming_links.iter().any(|link| {
+            link.source_id
+                .as_ref()
+                .map_or(false, |id| id.artifact_type == need_type)
+        })
+    }
+
+    /// Get the incoming links whose source artifact type matches the given need type.
+    pub fn covering_links_for_need(&self, need_type: &str) -> Vec<&Link> {
+        self.incoming_links
+            .iter()
+            .filter(|link| {
+                link.source_id
+                    .as_ref()
+                    .map_or(false, |id| id.artifact_type == need_type)
+            })
+            .collect()
+    }
 }
 
 #[cfg(test)]

@@ -18,13 +18,15 @@
  */
 
 import * as vscode from "vscode";
-import { RequirementIndex, detectAtPosition, reqIdToString } from "./index";
+import { RequirementIndex, detectAtPosition, reqIdToString, parseReqId } from "./index";
 import {
   OvftDefinitionProvider,
   OvftReferenceProvider,
   OvftCodeLensProvider,
   OvftDocumentHighlightProvider,
   OvftHoverProvider,
+  OvftNeedsLinkProvider,
+  OvftNeedsDecorationManager,
   specsToLocations,
   tagsToLocations,
   navigateToLocations,
@@ -126,8 +128,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.languages.registerReferenceProvider(ALL_LANGUAGES, new OvftReferenceProvider(index)),
     vscode.languages.registerCodeLensProvider(ALL_LANGUAGES, new OvftCodeLensProvider(index, traceEngine)),
     vscode.languages.registerDocumentHighlightProvider(ALL_LANGUAGES, new OvftDocumentHighlightProvider(index)),
-    vscode.languages.registerHoverProvider(ALL_LANGUAGES, new OvftHoverProvider(index, traceEngine))
+    vscode.languages.registerHoverProvider(ALL_LANGUAGES, new OvftHoverProvider(index, traceEngine)),
+    vscode.languages.registerDocumentLinkProvider({ scheme: "file", pattern: "**/*.{md,markdown}" }, new OvftNeedsLinkProvider(traceEngine))
   );
+
+  // Needs coverage decorations (green underline = covered, wavy orange = uncovered)
+  const needsDecorations = new OvftNeedsDecorationManager(traceEngine);
+  context.subscriptions.push(needsDecorations);
+
+  // Refresh decorations when the index updates (after trace completes)
+  index.onDidUpdate(() => needsDecorations.refresh());
 
   // Register requirement tree view in the sidebar
   const treeProvider = new RequirementTreeProvider(traceEngine);
@@ -268,6 +278,49 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   context.subscriptions.push(
     vscode.commands.registerCommand("ovft.transitiveFollowUp", () => transitiveFollow("up")),
     vscode.commands.registerCommand("ovft.transitiveFollowDown", () => transitiveFollow("down"))
+  );
+
+  // Navigate to covering items for a specific needs type
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      "ovft.navigateNeedCoverage",
+      async (specId: string, needType: string) => {
+        const traceItem = traceEngine.findItem(specId);
+        if (!traceItem) {
+          vscode.window.showInformationMessage(`OVFT: Item ${specId} not found in trace.`);
+          return;
+        }
+
+        const coveringLinks = traceItem.incoming_links.filter((l) => {
+          if (!l.source_id) return false;
+          const parsed = parseReqId(l.source_id);
+          return parsed && parsed.artifactType === needType;
+        });
+
+        if (coveringLinks.length === 0) {
+          vscode.window.showWarningMessage(
+            `OVFT: No ${needType} coverage found for ${specId}`
+          );
+          return;
+        }
+
+        const locations: vscode.Location[] = [];
+        for (const link of coveringLinks) {
+          if (!link.source_id) continue;
+          const sourceItem = traceEngine.findItem(link.source_id);
+          if (sourceItem?.file_path && sourceItem?.line) {
+            locations.push(
+              new vscode.Location(
+                vscode.Uri.file(sourceItem.file_path),
+                new vscode.Position(sourceItem.line - 1, 0)
+              )
+            );
+          }
+        }
+
+        await navigateToLocations(locations, `${needType} coverage for ${specId}`);
+      }
+    )
   );
 
   // Show trace report in webview
