@@ -41,7 +41,7 @@ impl MarkdownImporter {
     /// Create a new markdown importer
     pub fn new() -> Self {
         Self {
-            id_regex: Regex::new(r"`([a-zA-Z]+)~([a-zA-Z0-9._-]+)~(\d+)`").unwrap(),
+            id_regex: Regex::new(r"^\s*`([a-zA-Z]+)~([a-zA-Z0-9._-]+)~(\d+)`\s*$").unwrap(),
             needs_regex: Regex::new(r"(?i)^\*?\*?Needs:\*?\*?\s*(.+)$").unwrap(),
             covers_regex: Regex::new(r"(?i)^\*?\*?Covers:\*?\*?\s*$").unwrap(),
             covers_inline_regex: Regex::new(r"(?i)^\*?\*?Covers:\*?\*?\s*(.+)$").unwrap(),
@@ -480,6 +480,32 @@ Status: approved
         assert_eq!(item.needs, vec!["dsn", "impl", "utest"]);
         assert_eq!(item.tags, vec!["security", "login"]);
         assert_eq!(item.status, ItemStatus::Approved);
+    }
+
+    #[test]
+    fn test_inline_reference_is_not_a_definition() {
+        let importer = MarkdownImporter::new();
+        let content = r#"
+# First Requirement
+`req~first~1`
+
+This requirement mentions [`req~second~1`](other_spec.md) inline in prose,
+which is a cross-reference, not a new item definition.
+
+Needs: impl
+
+# Second Requirement
+`req~second~1`
+
+The referenced requirement, defined exactly once.
+
+Needs: impl
+"#;
+
+        let temp_file = NamedTempFile::new().unwrap();
+        let items = importer.parse_markdown(content, temp_file.path()).unwrap();
+        let ids: Vec<String> = items.iter().map(|i| i.id.name.clone()).collect();
+        assert_eq!(ids, vec!["first", "second"]);
     }
 
     #[test]
