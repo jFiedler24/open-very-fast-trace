@@ -28,10 +28,14 @@ pulldown-cmark-to-cmark.workspace = true
 env_logger.workspace = true
 log.workspace = true
 thiserror.workspace = true
+quick-xml.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
 pretty_assertions.workspace = true
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+js-sys.workspace = true
 
 [lib]
 name = "ovft_core"

@@ -18,6 +18,8 @@ impl Linker {
         &self,
         items: Vec<SpecificationItem>,
     ) -> Result<Vec<LinkedSpecificationItem>> {
+        let items = self.resolve_alias_references(items);
+
         // First, build the lookup map and check for duplicates
         let mut items_by_id = HashMap::new();
         let mut duplicate_ids = Vec::new();
@@ -49,6 +51,76 @@ impl Linker {
         self.analyze_coverage(&mut linked_items);
 
         Ok(linked_items)
+    }
+
+    /// Resolve placeholder covered IDs created by alias tags (targets like ABC-1234).
+    ///
+    /// A placeholder has an empty artifact type and revision 0. It is resolved
+    /// against the aliases declared on items (`**Aliases:**` in markdown specs)
+    /// matched case-insensitively; when no alias matches, an unambiguous match
+    /// on the item name alone is accepted. Unresolvable or ambiguous
+    /// placeholders are left untouched and surface as orphaned links.
+    /// [impl->req~alias-id-resolution~1]
+    fn resolve_alias_references(&self, items: Vec<SpecificationItem>) -> Vec<SpecificationItem> {
+        let needs_resolution = items
+            .iter()
+            .any(|item| item.covers.iter().any(|id| id.artifact_type.is_empty()));
+        if !needs_resolution {
+            return items;
+        }
+
+        // alias (lowercased) -> canonical IDs declaring it
+        let mut alias_index: HashMap<String, Vec<SpecificationItemId>> = HashMap::new();
+        // item name (lowercased) -> canonical IDs with that name
+        let mut name_index: HashMap<String, Vec<SpecificationItemId>> = HashMap::new();
+        for item in &items {
+            if item.id.artifact_type.is_empty() {
+                continue;
+            }
+            for alias in &item.aliases {
+                alias_index
+                    .entry(alias.to_lowercase())
+                    .or_default()
+                    .push(item.id.clone());
+            }
+            name_index
+                .entry(item.id.name.to_lowercase())
+                .or_default()
+                .push(item.id.clone());
+        }
+
+        let resolve = |placeholder: &SpecificationItemId| -> SpecificationItemId {
+            let key = placeholder.name.to_lowercase();
+            let candidates = alias_index
+                .get(&key)
+                .or_else(|| name_index.get(&key));
+            match candidates {
+                Some(ids) if ids.len() == 1 => ids[0].clone(),
+                // Multiple revisions of the same item: resolve to the newest
+                Some(ids)
+                    if ids
+                        .iter()
+                        .all(|id| {
+                            id.artifact_type == ids[0].artifact_type && id.name == ids[0].name
+                        }) =>
+                {
+                    ids.iter().max_by_key(|id| id.revision).unwrap().clone()
+                }
+                _ => placeholder.clone(),
+            }
+        };
+
+        items
+            .into_iter()
+            .map(|mut item| {
+                for covered_id in &mut item.covers {
+                    if covered_id.artifact_type.is_empty() {
+                        *covered_id = resolve(covered_id);
+                    }
+                }
+                item
+            })
+            .collect()
     }
 
     /// Process coverage relationships between items
@@ -221,6 +293,60 @@ impl Default for Linker {
 mod tests {
     use super::*;
     use crate::core::{SpecificationItem, SpecificationItemId};
+
+    #[test]
+    fn test_alias_resolution() {
+        let linker = Linker::new();
+
+        let req_id = SpecificationItemId::new("req".to_string(), "agent-auth".to_string(), 1);
+        let req = SpecificationItem::builder(req_id.clone())
+            .needs("impl".to_string())
+            .alias("ABC-1234".to_string())
+            .build();
+
+        // Alias tag targeting "abc-1234" (lowercase) — case-insensitive resolution
+        let imp = SpecificationItem::builder(SpecificationItemId::new(
+            "impl".to_string(),
+            "agent-auth-impl".to_string(),
+            0,
+        ))
+        .covers(SpecificationItemId::new(String::new(), "abc-1234".to_string(), 0))
+        .build();
+
+        let linked = linker.link_items(vec![req, imp]).unwrap();
+
+        let req_linked = linked.iter().find(|li| li.item.id == req_id).unwrap();
+        assert!(req_linked.is_covered());
+
+        let imp_linked = linked
+            .iter()
+            .find(|li| li.item.id.artifact_type == "impl")
+            .unwrap();
+        assert_eq!(imp_linked.outgoing_links[0].target_id, req_id);
+        assert!(matches!(
+            imp_linked.outgoing_links[0].status,
+            LinkStatus::Covers
+        ));
+    }
+
+    #[test]
+    fn test_unresolvable_alias_is_orphaned() {
+        let linker = Linker::new();
+
+        let imp = SpecificationItem::builder(SpecificationItemId::new(
+            "impl".to_string(),
+            "thing-impl".to_string(),
+            0,
+        ))
+        .covers(SpecificationItemId::new(String::new(), "ZZZ-9".to_string(), 0))
+        .build();
+
+        let linked = linker.link_items(vec![imp]).unwrap();
+        assert!(matches!(
+            linked[0].outgoing_links[0].status,
+            LinkStatus::Orphaned
+        ));
+    }
 
     #[test]
     fn test_simple_linking() {

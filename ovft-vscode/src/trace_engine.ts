@@ -30,6 +30,7 @@ export interface TraceLinkedItem {
   revision: number;
   title: string | null;
   description: string | null;
+  aliases: string[];
   needs: string[];
   covers: string[];
   depends: string[];

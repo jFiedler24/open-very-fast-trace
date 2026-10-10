@@ -134,9 +134,14 @@ impl Tracer {
 
         // Check for broken outgoing links
         for link in &item.outgoing_links {
+            let target = if link.target_id.artifact_type.is_empty() {
+                link.target_id.name.clone()
+            } else {
+                link.target_id.to_string()
+            };
             match link.status {
                 crate::core::LinkStatus::Orphaned => {
-                    issues.push(format!("covers non-existing item {}", link.target_id));
+                    issues.push(format!("covers non-existing item {}", target));
                 }
                 crate::core::LinkStatus::Duplicate => {
                     issues.push(format!("has duplicate ID {}", item.item.id));

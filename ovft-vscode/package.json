@@ -64,6 +64,21 @@
         "command": "ovft.refreshIndex",
         "title": "OVFT: Refresh Requirement Index",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "ovft.toggleTagVisibility",
+        "title": "OVFT: Toggle Tag Visibility",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "ovft.importReqif",
+        "title": "OVFT: Import ReqIF…",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "ovft.exportReqif",
+        "title": "OVFT: Export ReqIF…",
+        "icon": "$(cloud-upload)"
       }
     ],
     "menus": {
@@ -183,6 +198,11 @@
           "type": "boolean",
           "default": true,
           "description": "Show CodeLens annotations above requirement IDs and tags"
+        },
+        "ovft.hideTags": {
+          "type": "boolean",
+          "default": true,
+          "description": "Hide raw OVFT tag lines in the editor and show a subtle badge with the covered requirement IDs instead"
         }
       }
     }

@@ -31,11 +31,17 @@ pub enum Error {
     #[error("Invalid specification item ID: {0}")]
     InvalidId(String),
 
+    #[error("Git error: {0}")]
+    Git(String),
+
     #[error("Duplicate specification item: {0}")]
     Duplicate(String),
 
     #[error("Requirement not found: {0}")]
     RequirementNotFound(String),
+
+    #[error("ReqIF error: {0}")]
+    ReqIf(String),
 }
 
 /// Result type alias for the library

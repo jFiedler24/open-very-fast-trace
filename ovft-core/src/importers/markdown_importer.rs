@@ -35,6 +35,8 @@ pub struct MarkdownImporter {
     description_field_regex: Regex,
     /// Regex for matching rationale fields like "**Rationale:** Some rationale"
     rationale_field_regex: Regex,
+    /// Regex for matching aliases fields like "**Aliases:** ABC-1234, JIRA-77"
+    aliases_field_regex: Regex,
 }
 
 impl MarkdownImporter {
@@ -57,6 +59,7 @@ impl MarkdownImporter {
             title_field_regex: Regex::new(r"(?i)^\*?\*?Title:\*?\*?\s*(.+)$").unwrap(),
             description_field_regex: Regex::new(r"(?i)^\*?\*?Description:\*?\*?\s*(.+)$").unwrap(),
             rationale_field_regex: Regex::new(r"(?i)^\*?\*?Rationale:\*?\*?\s*(.+)$").unwrap(),
+            aliases_field_regex: Regex::new(r"(?i)^\*?\*?Aliases?:\*?\*?\s*(.+)$").unwrap(),
         }
     }
 
@@ -243,6 +246,11 @@ impl MarkdownImporter {
                 if !rationale_str.is_empty() {
                     rationale = rationale_str.to_string();
                 }
+            } else if let Some(captures) = self.aliases_field_regex.captures(line) {
+                // Handle structured aliases fields like "**Aliases:** ABC-1234, JIRA-77"
+                let aliases_str = captures.get(1).unwrap().as_str();
+                let aliases = self.parse_list(aliases_str);
+                builder = builder.aliases(aliases);
             } else if self.covers_regex.is_match(line) {
                 current_section = Section::Covers;
             } else if self.depends_regex.is_match(line) {
@@ -265,6 +273,8 @@ impl MarkdownImporter {
                 current_section = Section::Rationale;
             } else if self.comment_regex.is_match(line) {
                 current_section = Section::Comment;
+            } else if self.is_horizontal_rule(line) {
+                // Horizontal rule between items — not part of the description
             } else if line.trim().starts_with('-')
                 || line.trim().starts_with('*')
                 || line.trim().starts_with('+')
@@ -360,6 +370,15 @@ impl MarkdownImporter {
         line.trim_start().trim_start_matches('#').trim().to_string()
     }
 
+    /// Check if a line is a horizontal rule (---, ***, ___)
+    fn is_horizontal_rule(&self, line: &str) -> bool {
+        let trimmed = line.trim();
+        trimmed.len() >= 3
+            && trimmed
+                .chars()
+                .all(|c| c == '-' || c == '*' || c == '_')
+    }
+
     /// Check if a line is a structured field that should not be added to description
     fn is_structured_field(&self, line: &str) -> bool {
         self.title_field_regex.is_match(line)
@@ -373,6 +392,7 @@ impl MarkdownImporter {
             || self.status_regex.is_match(line)
             || self.rationale_regex.is_match(line)
             || self.comment_regex.is_match(line)
+            || self.aliases_field_regex.is_match(line)
     }
 
     /// Parse a comma-separated list of covers
@@ -539,6 +559,28 @@ Needs: dsn
             .unwrap()
             .contains("password security"));
         assert!(item.comment.as_ref().unwrap().contains("future versions"));
+    }
+
+    #[test]
+    fn test_parse_aliases_field() {
+        let importer = MarkdownImporter::new();
+        let content = r#"
+## req~agent-auth~1
+
+The system shall support agent authentication.
+
+**Aliases:** ABC-1234, JIRA-77
+
+Needs: impl
+"#;
+
+        let temp_file = NamedTempFile::new().unwrap();
+        let items = importer.parse_markdown(content, temp_file.path()).unwrap();
+        assert_eq!(items.len(), 1);
+
+        let item = &items[0];
+        assert_eq!(item.aliases, vec!["ABC-1234", "JIRA-77"]);
+        assert!(!item.description.as_ref().unwrap().contains("ABC-1234"));
     }
 
     #[test]

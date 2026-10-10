@@ -159,3 +159,101 @@ This document defines the detailed requirements for the Open Very Fast Trace (OV
 **Tags:** statistics, defects, analysis, reporting
 
 **Needs:** dsn
+
+---
+
+## req~release-notes-from-requirements~1
+
+**Title:** Generate release notes from newly covered requirements
+
+**Description:** The system shall provide a command that diffs requirement coverage between a baseline git ref (default: latest tag) and the current state, and renders requirements that became covered as markdown grouped by artifact type, showing title, ID, and the first description line.
+
+**Covers:** feat~release-notes~1
+
+**Rationale:** Coverage diffs between releases are exactly the set of delivered features; rendering them is mechanical once tracing exists.
+
+**Tags:** release, reporting, git
+
+**Needs:** impl
+
+---
+
+## req~title-first-report~1
+
+**Title:** Title-first report items with filtering
+
+**Description:** Each item in the HTML report shall display its human-readable title as the heading with the full requirement ID rendered as a badge, and the report shall provide a text and status filter over all items.
+
+**Covers:** feat~readable-html-report~1
+
+**Rationale:** Scanning a report by title is an order of magnitude faster than scanning by machine ID.
+
+**Tags:** reporting, usability, html
+
+**Needs:** impl
+
+---
+
+## req~alias-id-resolution~1
+
+**Title:** Resolve alias IDs in coverage tags
+
+**Description:** Coverage tags may reference an item by an alias declared in its spec via `**Aliases:**` (e.g. a tag pointing at ABC-1234 instead of the full ID). The linker shall resolve aliases case-insensitively, fall back to an unambiguous match on the item name, pick the newest revision when several exist, and report unresolved aliases as orphaned coverage.
+
+**Aliases:** OVFT-42
+
+**Covers:** feat~short-alias-ids~1
+
+**Rationale:** Aliases are only useful if the tracer resolves them transparently to canonical IDs.
+
+**Tags:** usability, ids, linking
+
+**Needs:** impl
+
+---
+
+## req~editor-tag-hiding~1
+
+**Title:** Collapse tag-only lines in VS Code
+
+**Description:** The extension shall hide lines consisting solely of coverage tags (with optional comment markers), rendering an inline badge with the covered IDs instead, and reveal the raw line while it is selected. A command and a setting shall toggle the behavior.
+
+**Covers:** feat~editor-tag-hiding~1
+
+**Rationale:** Readability complaints about tag noise are the most common criticism of the tool.
+
+**Tags:** usability, editor, vscode
+
+**Needs:** impl
+
+---
+
+## req~reqif-import~1
+
+**Title:** Import ReqIF files as markdown specs
+
+**Description:** The system shall parse ReqIF XML, map spec objects to items (artifact type from the object type via a configurable map, human-readable ID from the long name, ReqIF identifier kept as alias, XHTML text stripped to plain text), map relations to covers links, tolerate unknown elements, and render the result as a generated markdown spec document.
+
+**Covers:** feat~reqif-interchange~1
+
+**Rationale:** Imported customer requirements become first-class traceable items while the generated file stays clearly marked as non-editable.
+
+**Tags:** interoperability, reqif, import
+
+**Needs:** impl
+
+---
+
+## req~reqif-export~1
+
+**Title:** Export traced items as ReqIF
+
+**Description:** The system shall export all traced items as a ReqIF 1.1 document with one object type per artifact type, the item text as an XHTML attribute, and covers links as spec relations, such that re-importing the export yields the same canonical IDs and links.
+
+**Covers:** feat~reqif-interchange~1
+
+**Rationale:** A lossless round-trip lets teams answer customer tools with live traceability data instead of stale spreadsheets.
+
+**Tags:** interoperability, reqif, export
+
+**Needs:** impl

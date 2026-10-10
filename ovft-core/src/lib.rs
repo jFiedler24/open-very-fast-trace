@@ -27,7 +27,9 @@ pub mod config;
 pub mod core;
 pub mod error;
 pub mod importers;
+pub mod release_notes;
 pub mod reporters;
+pub mod reqif;
 
 pub use config::Config;
 pub use core::{TraceResult, Tracer};

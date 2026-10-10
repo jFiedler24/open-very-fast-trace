@@ -34,6 +34,7 @@ import {
 import { TraceEngine, TraceLinkedItem } from "./trace_engine";
 import { OvftDiagnosticsProvider } from "./diagnostics";
 import { RequirementTreeProvider } from "./tree_provider";
+import { OvftTagVisibilityManager } from "./tag_visibility";
 
 // All file types we operate on — we register broadly but our providers
 // return undefined when the cursor isn't on a requirement, so they
@@ -138,6 +139,22 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   // Refresh decorations when the index updates (after trace completes)
   index.onDidUpdate(() => needsDecorations.refresh());
+
+  // Tag visibility — hides raw OVFT tag lines behind a subtle badge
+  const tagVisibility = new OvftTagVisibilityManager();
+  context.subscriptions.push(tagVisibility);
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand("ovft.toggleTagVisibility", async () => {
+      const config = vscode.workspace.getConfiguration("ovft");
+      const current = config.get("hideTags", true);
+      await config.update("hideTags", !current, vscode.ConfigurationTarget.Global);
+      tagVisibility.refresh();
+      vscode.window.showInformationMessage(
+        `OVFT: Tag hiding ${!current ? "enabled" : "disabled"}.`
+      );
+    })
+  );
 
   // Register requirement tree view in the sidebar
   const treeProvider = new RequirementTreeProvider(traceEngine);
@@ -357,6 +374,83 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }
 
       vscode.window.showInformationMessage("OVFT: Requirement index refreshed.");
+    })
+  );
+
+  // Import a ReqIF file as an OVFT markdown specification
+  context.subscriptions.push(
+    vscode.commands.registerCommand("ovft.importReqif", async () => {
+      try {
+        const picked = await vscode.window.showOpenDialog({
+          title: "Import ReqIF",
+          canSelectMany: false,
+          filters: { "ReqIF files": ["reqif"] },
+        });
+        if (!picked || picked.length === 0) return;
+
+        const inputUri = picked[0];
+        const content = Buffer.from(await vscode.workspace.fs.readFile(inputUri)).toString("utf-8");
+
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const wasm = require("../pkg/ovft_wasm");
+        const markdown: string = wasm.import_reqif_to_markdown(content, "[]");
+
+        const defaultUri = vscode.Uri.file(inputUri.fsPath.replace(/\.[^.\\/]+$/, "") + ".md");
+        const target = await vscode.window.showSaveDialog({
+          title: "Save imported specification",
+          defaultUri,
+          filters: { "Markdown files": ["md"] },
+        });
+        if (!target) return;
+
+        await vscode.workspace.fs.writeFile(target, Buffer.from(markdown, "utf-8"));
+
+        const itemCount = (markdown.match(/^## /gm) ?? []).length;
+        const doc = await vscode.workspace.openTextDocument(target);
+        await vscode.window.showTextDocument(doc);
+        vscode.window.showInformationMessage(
+          `OVFT: Imported ${itemCount} items from ${vscode.workspace.asRelativePath(inputUri)}.`
+        );
+      } catch (e) {
+        vscode.window.showErrorMessage(`OVFT: ReqIF import failed: ${e}`);
+      }
+    })
+  );
+
+  // Export the current trace result as a ReqIF file
+  context.subscriptions.push(
+    vscode.commands.registerCommand("ovft.exportReqif", async () => {
+      try {
+        const result = traceEngine.result;
+        if (!result) {
+          vscode.window.showWarningMessage(
+            "OVFT: No trace result yet — please wait for the analysis to finish."
+          );
+          return;
+        }
+
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const wasm = require("../pkg/ovft_wasm");
+        const xml: string = wasm.export_reqif_from_trace(JSON.stringify(result));
+
+        const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri;
+        const defaultUri = workspaceRoot
+          ? vscode.Uri.joinPath(workspaceRoot, "trace.reqif")
+          : undefined;
+        const target = await vscode.window.showSaveDialog({
+          title: "Export ReqIF",
+          defaultUri,
+          filters: { "ReqIF files": ["reqif"] },
+        });
+        if (!target) return;
+
+        await vscode.workspace.fs.writeFile(target, Buffer.from(xml, "utf-8"));
+        vscode.window.showInformationMessage(
+          `OVFT: Exported ${result.total_items} items to ${vscode.workspace.asRelativePath(target)}.`
+        );
+      } catch (e) {
+        vscode.window.showErrorMessage(`OVFT: ReqIF export failed: ${e}`);
+      }
     })
   );
 

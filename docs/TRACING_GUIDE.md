@@ -192,6 +192,62 @@ Multiple test functions can cover the same `val` item.
 
 Both forms are equivalent. Place them in comments appropriate for the language (`//`, `#`, `--`, etc.).
 
+**Alias tag** — an item can declare short external IDs (ticket keys, DOORS IDs) and tags can reference them instead of the full ID:
+```markdown
+## req~alias-id-resolution~1
+
+**Aliases:** OVFT-42
+```
+```
+[impl->OVFT-42]
+```
+Aliases resolve case-insensitively and always point at the newest revision of the item. An alias that matches nothing is reported as orphaned coverage, like any other broken reference.
+
+---
+
+## Release Notes from Requirements
+
+`cargo ovft release-notes` compares the current coverage against a git ref (default: the most recent tag) and summarizes every requirement that became covered since then as markdown:
+
+```bash
+cargo ovft release-notes                     # since latest tag, to stdout
+cargo ovft release-notes --from v0.1.0       # explicit baseline
+cargo ovft release-notes -o RELEASE_NOTES.md # write to file
+```
+
+The artifact types included are configurable via `release_note_types` in `.ovft.toml` (default: `["feat", "req"]`). Wire it into your release pipeline, e.g. on tag push:
+
+```yaml
+- run: cargo ovft release-notes --from ${{ github.event.release.tag_name }}~1 -o notes.md
+```
+
+---
+
+## Readability Features
+
+- The HTML report leads with each item's human-readable title, shows the full ID and aliases as badges, summarizes coverage per artifact type, and offers a text/status filter bar.
+- The VS Code extension hides lines that contain only coverage tags, showing a small inline badge instead (the raw line reappears while the cursor is on it). Toggle with the `OVFT: Toggle Tag Visibility` command or the `ovft.hideTags` setting.
+
+---
+
+## ReqIF Interchange
+
+Exchange with DOORS/Polarion-style tools via the OMG ReqIF format:
+
+```bash
+# Import a customer spec: generates a markdown document with items,
+# aliases (ReqIF identifiers) and covers links from relations
+cargo ovft reqif import customer.reqif --out docs/requirements/customer.md
+
+# Map the customer's type names onto your artifact types
+cargo ovft reqif import customer.reqif --map "Customer Requirement=creq,Requirement=req"
+
+# Export your items + trace links back to ReqIF
+cargo ovft reqif export --out trace.reqif
+```
+
+Imported files are marked as generated — treat the ReqIF side as the source of truth for those items and re-import on change. Export is lossless for OVFT itself: re-importing an export yields the same canonical IDs.
+
 ---
 
 ## Configuration (.ovft.toml)

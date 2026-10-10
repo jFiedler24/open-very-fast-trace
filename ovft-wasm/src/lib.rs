@@ -5,6 +5,7 @@ use ovft_core::{
 use ovft_core::core::Linker;
 use ovft_core::importers::{MarkdownImporter, TagImporter};
 use ovft_core::reporters::HtmlReporter;
+use ovft_core::reqif::{export_reqif, import_reqif, render_imported_markdown};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -48,6 +49,7 @@ pub struct JsLinkedItem {
     pub revision: u32,
     pub title: Option<String>,
     pub description: Option<String>,
+    pub aliases: Vec<String>,
     pub needs: Vec<String>,
     pub covers: Vec<String>,
     pub depends: Vec<String>,
@@ -86,6 +88,7 @@ fn to_js_linked_item(item: &LinkedSpecificationItem) -> JsLinkedItem {
         revision: item.item.id.revision,
         title: item.item.title.clone(),
         description: item.item.description.clone(),
+        aliases: item.item.aliases.clone(),
         needs: item.item.needs.clone(),
         covers: item.item.covers.iter().map(|c| c.to_string()).collect(),
         depends: item.item.depends.iter().map(|d| d.to_string()).collect(),
@@ -245,6 +248,55 @@ pub fn render_html_report(trace_result_json: &str) -> std::result::Result<String
         .map_err(|e| JsValue::from_str(&e.to_string()))
 }
 
+/// Import a ReqIF XML document and return it as an OVFT markdown
+/// specification. `type_map_json` is a JSON array of `[from, to]` string
+/// pairs mapping ReqIF type names to artifact types (empty string or "[]"
+/// means no mapping).
+#[wasm_bindgen]
+pub fn import_reqif_to_markdown(xml: &str, type_map_json: &str) -> std::result::Result<String, JsValue> {
+    let type_map: Vec<(String, String)> = if type_map_json.trim().is_empty() {
+        Vec::new()
+    } else {
+        serde_json::from_str(type_map_json).map_err(|e| JsValue::from_str(&e.to_string()))?
+    };
+
+    let items = import_reqif(xml, &type_map).map_err(|e| JsValue::from_str(&e.to_string()))?;
+    Ok(render_imported_markdown("ReqIF import", &items))
+}
+
+/// Export the items of a trace result (as returned by `trace_from_contents`,
+/// serialized to JSON) as a ReqIF XML document.
+#[wasm_bindgen]
+pub fn export_reqif_from_trace(trace_result_json: &str) -> std::result::Result<String, JsValue> {
+    let js_result: JsTraceResult =
+        serde_json::from_str(trace_result_json).map_err(|e| JsValue::from_str(&e.to_string()))?;
+
+    let items: Vec<SpecificationItem> = js_result
+        .items
+        .iter()
+        .filter_map(|ji| {
+            let id = SpecificationItemId::parse(&ji.id).ok()?;
+            let covers: Vec<SpecificationItemId> = ji
+                .covers
+                .iter()
+                .filter_map(|s| SpecificationItemId::parse(s).ok())
+                .collect();
+            let mut builder = SpecificationItem::builder(id)
+                .aliases(ji.aliases.clone())
+                .covers_multiple(covers);
+            if let Some(ref t) = ji.title {
+                builder = builder.title(t.clone());
+            }
+            if let Some(ref d) = ji.description {
+                builder = builder.description(d.clone());
+            }
+            Some(builder.build())
+        })
+        .collect();
+
+    export_reqif(&items).map_err(|e| JsValue::from_str(&e.to_string()))
+}
+
 /// Render HTML report directly from file contents (convenience: combines trace + render).
 #[wasm_bindgen]
 pub fn trace_and_render_html(spec_files_json: &str, source_files_json: &str) -> std::result::Result<String, JsValue> {
@@ -318,7 +370,9 @@ fn reconstruct_trace_result(js: &JsTraceResult) -> TraceResult {
                 .filter_map(|s| SpecificationItemId::parse(s).ok())
                 .collect();
 
-            let mut builder = SpecificationItem::builder(id).needs_multiple(ji.needs.clone());
+            let mut builder = SpecificationItem::builder(id)
+                .needs_multiple(ji.needs.clone())
+                .aliases(ji.aliases.clone());
             if let Some(ref t) = ji.title {
                 builder = builder.title(t.clone());
             }

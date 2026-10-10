@@ -60,6 +60,82 @@ fn main() -> Result<()> {
                         .long("check")
                         .help("Check for issues and return non-zero exit code if found")
                         .action(clap::ArgAction::SetTrue),
+                )
+                .subcommand(
+                    Command::new("release-notes")
+                        .about("Generate release notes from requirements newly covered since a git ref")
+                        .arg(
+                            Arg::new("from")
+                                .long("from")
+                                .value_name("GIT_REF")
+                                .help("Baseline git ref (default: most recent git tag)"),
+                        )
+                        .arg(
+                            Arg::new("output")
+                                .short('o')
+                                .long("output")
+                                .value_name("FILE")
+                                .help("Write release notes to a file instead of stdout"),
+                        )
+                        .arg(
+                            Arg::new("config")
+                                .long("config")
+                                .value_name("FILE")
+                                .help("Path to configuration file (.ovft.toml)")
+                                .required(false),
+                        )
+                        .arg(
+                            Arg::new("verbose")
+                                .short('v')
+                                .long("verbose")
+                                .help("Enable verbose output")
+                                .action(clap::ArgAction::SetTrue),
+                        ),
+                )
+                .subcommand(
+                    Command::new("reqif")
+                        .about("Import and export ReqIF (Requirements Interchange Format) documents")
+                        .subcommand_required(true)
+                        .arg_required_else_help(true)
+                        .subcommand(
+                            Command::new("import")
+                                .about("Import a ReqIF file and generate a markdown specification")
+                                .arg(
+                                    Arg::new("file")
+                                        .value_name("FILE")
+                                        .help("ReqIF XML file to import")
+                                        .required(true),
+                                )
+                                .arg(
+                                    Arg::new("out")
+                                        .long("out")
+                                        .value_name("FILE.md")
+                                        .help("Output markdown file (default: <input-stem>.md next to the input)"),
+                                )
+                                .arg(
+                                    Arg::new("map")
+                                        .long("map")
+                                        .value_name("MAP")
+                                        .help("Artifact type mapping, e.g. \"Customer Requirement=creq,Requirement=req\""),
+                                ),
+                        )
+                        .subcommand(
+                            Command::new("export")
+                                .about("Export the current project's specification items as ReqIF XML")
+                                .arg(
+                                    Arg::new("out")
+                                        .long("out")
+                                        .value_name("FILE.reqif")
+                                        .help("Write ReqIF XML to a file instead of stdout"),
+                                )
+                                .arg(
+                                    Arg::new("config")
+                                        .long("config")
+                                        .value_name("FILE")
+                                        .help("Path to configuration file (.ovft.toml)")
+                                        .required(false),
+                                ),
+                        ),
                 ),
         );
 
@@ -72,6 +148,13 @@ fn main() -> Result<()> {
 }
 
 fn run_ovft(matches: &ArgMatches) -> Result<()> {
+    if let Some(("release-notes", sub_matches)) = matches.subcommand() {
+        return run_release_notes(sub_matches);
+    }
+    if let Some(("reqif", sub_matches)) = matches.subcommand() {
+        return run_reqif(sub_matches);
+    }
+
     let input_dir = matches.get_one::<String>("input").unwrap();
     let output_file = matches.get_one::<String>("output").unwrap();
     let format = matches.get_one::<String>("format").unwrap();
@@ -190,6 +273,148 @@ fn run_ovft(matches: &ArgMatches) -> Result<()> {
         }
     }
 
+    Ok(())
+}
+
+/// Generate release notes from requirements newly covered since a git ref.
+/// [impl->req~release-notes-from-requirements~1]
+fn run_release_notes(matches: &ArgMatches) -> Result<()> {
+    let verbose = matches.get_flag("verbose");
+
+    let current_dir = env::current_dir().context("Failed to get current directory")?;
+    let project_root =
+        find_cargo_project_root(&current_dir).context("Not in a Cargo project directory")?;
+
+    let config = if let Some(config_path) = matches.get_one::<String>("config") {
+        Config::from_file(config_path)
+            .with_context(|| format!("Failed to load configuration from {}", config_path))?
+    } else {
+        Config::find_and_load_config(&current_dir).unwrap_or_default()
+    };
+
+    let from_ref = match matches.get_one::<String>("from") {
+        Some(git_ref) => git_ref.clone(),
+        None => ovft_core::release_notes::latest_tag(&project_root)
+            .context("Failed to determine latest git tag; pass --from <ref> explicitly")?,
+    };
+
+    if verbose {
+        println!("📁 Project root: {}", project_root.display());
+        println!("🏷️  Baseline ref: {}", from_ref);
+    }
+
+    let baseline = ovft_core::release_notes::trace_at_ref(&config, &project_root, &from_ref)
+        .with_context(|| format!("Failed to trace baseline at ref '{}'", from_ref))?;
+    let current = Tracer::new(config.clone())
+        .trace()
+        .context("Failed to run requirements traceability analysis")?;
+
+    let entries = ovft_core::release_notes::newly_covered_items(
+        &baseline,
+        &current,
+        &config.release_note_types,
+    );
+
+    if verbose {
+        println!("✨ Newly covered requirements: {}", entries.len());
+    }
+
+    let markdown = ovft_core::release_notes::render_markdown(&from_ref, &entries);
+
+    if let Some(output_file) = matches.get_one::<String>("output") {
+        std::fs::write(output_file, &markdown)
+            .with_context(|| format!("Failed to write release notes to {}", output_file))?;
+        println!("📄 Release notes written to: {}", output_file);
+    } else {
+        print!("{}", markdown);
+    }
+
+    Ok(())
+}
+
+/// Import or export ReqIF documents (dispatch for the nested subcommands).
+fn run_reqif(matches: &ArgMatches) -> Result<()> {
+    match matches.subcommand() {
+        Some(("import", sub_matches)) => run_reqif_import(sub_matches),
+        Some(("export", sub_matches)) => run_reqif_export(sub_matches),
+        _ => unreachable!(),
+    }
+}
+
+/// Import a ReqIF XML file and write a markdown specification.
+fn run_reqif_import(matches: &ArgMatches) -> Result<()> {
+    let input = matches.get_one::<String>("file").unwrap();
+    let input_path = PathBuf::from(input);
+    let xml = std::fs::read_to_string(&input_path)
+        .with_context(|| format!("Failed to read ReqIF file {}", input))?;
+
+    let type_map: Vec<(String, String)> = match matches.get_one::<String>("map") {
+        Some(map) => map
+            .split(',')
+            .map(|pair| {
+                let (from, to) = pair.split_once('=').with_context(|| {
+                    format!(
+                        "Invalid --map entry '{}', expected format 'ReqIF Type=artifact-type'",
+                        pair
+                    )
+                })?;
+                Ok((from.trim().to_string(), to.trim().to_string()))
+            })
+            .collect::<Result<_>>()?,
+        None => Vec::new(),
+    };
+
+    let items = ovft_core::reqif::import_reqif(&xml, &type_map)
+        .with_context(|| format!("Failed to parse ReqIF file {}", input))?;
+
+    let markdown = ovft_core::reqif::render_imported_markdown(input, &items);
+
+    let output_path = match matches.get_one::<String>("out") {
+        Some(out) => PathBuf::from(out),
+        None => input_path.with_extension("md"),
+    };
+    std::fs::write(&output_path, &markdown)
+        .with_context(|| format!("Failed to write {}", output_path.display()))?;
+    println!(
+        "📄 Imported {} items from {} to {}",
+        items.len(),
+        input,
+        output_path.display()
+    );
+    Ok(())
+}
+
+/// Export the current project's specification items as ReqIF XML.
+fn run_reqif_export(matches: &ArgMatches) -> Result<()> {
+    let current_dir = env::current_dir().context("Failed to get current directory")?;
+
+    let config = if let Some(config_path) = matches.get_one::<String>("config") {
+        Config::from_file(config_path)
+            .with_context(|| format!("Failed to load configuration from {}", config_path))?
+    } else {
+        Config::find_and_load_config(&current_dir).unwrap_or_default()
+    };
+
+    let trace_result = Tracer::new(config)
+        .trace()
+        .context("Failed to run requirements traceability analysis")?;
+
+    let items: Vec<ovft_core::SpecificationItem> = trace_result
+        .items
+        .iter()
+        .map(|linked| linked.item.clone())
+        .collect();
+
+    let xml =
+        ovft_core::reqif::export_reqif(&items).context("Failed to export items as ReqIF")?;
+
+    if let Some(output_file) = matches.get_one::<String>("out") {
+        std::fs::write(output_file, &xml)
+            .with_context(|| format!("Failed to write ReqIF export to {}", output_file))?;
+        println!("📄 ReqIF export written to: {}", output_file);
+    } else {
+        print!("{}", xml);
+    }
     Ok(())
 }
 

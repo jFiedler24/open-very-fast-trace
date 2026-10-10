@@ -358,6 +358,18 @@ body {
     background-color: #fff5f5;
 }
 
+.spec-item.status-covered:not(.defect) {
+    border-left: 4px solid #28a745;
+}
+
+.spec-item.status-partial:not(.defect) {
+    border-left: 4px solid #ffc107;
+}
+
+.spec-item.status-uncovered:not(.defect) {
+    border-left: 4px solid #dc3545;
+}
+
 .spec-item.orphaned-item {
     border-left: 4px solid #ffc107;
     background-color: #fffbf0;
@@ -392,16 +404,37 @@ body {
 .item-header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    margin-bottom: 15px;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 8px;
 }
 
-.item-id {
-    font-family: monospace;
-    font-size: 1.1rem;
-    color: #007bff;
-    margin: 0;
-    font-weight: 600;
+.item-id-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.item-id-badge {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 0.78rem;
+    color: #5a6b7b;
+    background-color: #eef2f5;
+    border: 1px solid #d8e0e6;
+    padding: 2px 7px;
+    border-radius: 4px;
+}
+
+.alias-badge {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 0.78rem;
+    color: #6b4fa1;
+    background-color: #f3eefb;
+    border: 1px solid #ddd0f0;
+    padding: 2px 7px;
+    border-radius: 4px;
 }
 
 .item-status {
@@ -410,15 +443,16 @@ body {
 }
 
 .coverage-badge {
-    padding: 4px 8px;
+    padding: 3px 10px;
     border-radius: 12px;
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    white-space: nowrap;
 }
 
-.coverage-badge.coverage-ok {
+.coverage-badge.coverage-covered {
     background-color: #d4edda;
     color: #155724;
 }
@@ -428,7 +462,7 @@ body {
     color: #856404;
 }
 
-.coverage-badge.coverage-error {
+.coverage-badge.coverage-uncovered {
     background-color: #f8d7da;
     color: #721c24;
 }
@@ -438,9 +472,11 @@ body {
 }
 
 .item-title {
-    color: #2c3e50;
-    margin-bottom: 10px;
+    color: #1a2733;
+    margin: 0;
     font-size: 1.1rem;
+    font-weight: 600;
+    line-height: 1.3;
 }
 
 .item-description {
@@ -757,4 +793,120 @@ html {
     font-weight: 600;
     text-decoration: underline wavy;
     text-decoration-color: #e67e22;
+}
+
+/* Report subtitle */
+.report-subtitle {
+    color: #6c757d;
+    margin: 6px 0 0 0;
+    font-size: 0.95rem;
+}
+
+/* Coverage summary strip (per artifact type) */
+.coverage-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid #e9ecef;
+}
+
+.coverage-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.coverage-chip .chip-type {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.coverage-chip.coverage-covered {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.coverage-chip.coverage-partial {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+.coverage-chip.coverage-uncovered {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+/* Items header + filter bar */
+.items-header {
+    margin-bottom: 20px;
+}
+
+.items-header h2 {
+    margin-bottom: 12px;
+}
+
+.filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    background: white;
+    padding: 10px 0;
+    z-index: 10;
+}
+
+#filter-input {
+    flex: 1 1 240px;
+    padding: 8px 12px;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    font-size: 0.95rem;
+}
+
+#filter-input:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.15);
+}
+
+.filter-buttons {
+    display: flex;
+    gap: 4px;
+}
+
+.filter-buttons button {
+    padding: 7px 12px;
+    border: 1px solid #ced4da;
+    background: #f8f9fa;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #495057;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.filter-buttons button:hover {
+    background: #e9ecef;
+}
+
+.filter-buttons button.active {
+    background: #3498db;
+    border-color: #3498db;
+    color: white;
+}
+
+.filter-count {
+    color: #6c757d;
+    font-size: 0.85rem;
+    white-space: nowrap;
 }

@@ -19,6 +19,9 @@ pub struct Config {
     pub verbose: bool,
     /// Output directory for reports
     pub output_dir: Option<PathBuf>,
+    /// Artifact types included in release notes (cargo ovft release-notes)
+    #[serde(default = "crate::release_notes::default_release_note_types")]
+    pub release_note_types: Vec<String>,
 }
 
 impl Default for Config {
@@ -68,6 +71,7 @@ impl Default for Config {
             ],
             verbose: false,
             output_dir: Some(PathBuf::from("target")),
+            release_note_types: crate::release_notes::default_release_note_types(),
         }
     }
 }
@@ -95,6 +99,7 @@ impl Config {
             ],
             verbose: false,
             output_dir: Some(PathBuf::from("target")),
+            release_note_types: crate::release_notes::default_release_note_types(),
         }
     }
 

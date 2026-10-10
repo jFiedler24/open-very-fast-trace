@@ -19,11 +19,20 @@ impl HtmlReporter {
 
     /// Render an HTML report to a String without writing to disk.
     /// This is the pure function used by WASM and the webview.
+    /// [impl->req~title-first-report~1]
     pub fn render_report_html(&self, trace_result: &TraceResult) -> Result<String> {
         let processed_trace_result = self.process_markdown_content(trace_result);
 
+        let mut coverage_strip: Vec<(String, crate::core::CoverageSummary)> = trace_result
+            .coverage_summary
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+        coverage_strip.sort_by(|a, b| a.0.cmp(&b.0));
+
         let template = HtmlReportTemplate {
             trace_result: &processed_trace_result,
+            coverage_strip,
             css: include_str!("../assets/report.css"),
         };
 
@@ -101,6 +110,7 @@ impl HtmlReporter {
 #[template(path = "report.html")]
 struct HtmlReportTemplate<'a> {
     trace_result: &'a TraceResult,
+    coverage_strip: Vec<(String, crate::core::CoverageSummary)>,
     css: &'a str,
 }
 
@@ -142,6 +152,7 @@ mod tests {
 
         let template = HtmlReportTemplate {
             trace_result: &trace_result,
+            coverage_strip: vec![],
             css: "/* test css */",
         };
 

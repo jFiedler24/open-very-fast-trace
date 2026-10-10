@@ -133,6 +133,9 @@ pub struct SpecificationItem {
     pub covers: Vec<SpecificationItemId>,
     /// Dependencies on other specification items
     pub depends: Vec<SpecificationItemId>,
+    /// Short external aliases for this item (e.g. "ABC-1234"), usable as tag targets
+    #[serde(default)]
+    pub aliases: Vec<String>,
     /// Source location where this item is defined
     pub location: Option<Location>,
 }
@@ -151,6 +154,7 @@ impl SpecificationItem {
             needs: Vec::new(),
             covers: Vec::new(),
             depends: Vec::new(),
+            aliases: Vec::new(),
             location: None,
         }
     }
@@ -162,9 +166,14 @@ impl SpecificationItem {
 
     /// Get the title or generate one from the ID if not set
     pub fn title_or_fallback(&self) -> String {
-        self.title
-            .clone()
-            .unwrap_or_else(|| self.id.name.replace(['-', '_'], " "))
+        self.title.clone().unwrap_or_else(|| {
+            let derived = self.id.name.replace(['-', '_'], " ");
+            let mut chars = derived.chars();
+            match chars.next() {
+                Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+                None => derived,
+            }
+        })
     }
 
     /// Check if this item is a terminating item (doesn't need coverage)
@@ -237,6 +246,16 @@ impl SpecificationItemBuilder {
 
     pub fn covers_multiple(mut self, covered_ids: Vec<SpecificationItemId>) -> Self {
         self.item.covers.extend(covered_ids);
+        self
+    }
+
+    pub fn alias(mut self, alias: String) -> Self {
+        self.item.aliases.push(alias);
+        self
+    }
+
+    pub fn aliases(mut self, aliases: Vec<String>) -> Self {
+        self.item.aliases.extend(aliases);
         self
     }
 

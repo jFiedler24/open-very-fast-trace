@@ -2,7 +2,7 @@
 # This file configures the requirements traceability analysis
 
 # Directories containing source code files to scan for tags
-source_dirs = ["src", "ovft-core/src", "cargo-ovft/src", "docs"]
+source_dirs = ["src", "ovft-core/src", "cargo-ovft/src", "ovft-vscode/src", "docs"]
 
 # Directories containing specification files (markdown)
 spec_dirs = ["docs/requirements"]

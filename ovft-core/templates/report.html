@@ -9,8 +9,11 @@
 <body>
     <div class="container">
         <header class="report-header">
-            <h1>Requirements Tracing Report</h1>
-            <div class="status-badge">
+            <div>
+                <h1>Requirements Tracing Report</h1>
+                <p class="report-subtitle">{{ trace_result.total_items }} items · {{ trace_result.defect_count }} defects</p>
+            </div>
+            <div class="status-badge {% if trace_result.is_success %}success{% else %}error{% endif %}">
                 <span class="status-indicator">
                     {%- if trace_result.is_success -%}✓{%- else -%}✗{%- endif -%}
                 </span>
@@ -33,9 +36,19 @@
                 </div>
                 <div class="summary-item">
                     <span class="summary-label">Defects:</span>
-                    <span class="summary-value">{{ trace_result.defect_count }}</span>
+                    <span class="summary-value{% if trace_result.defect_count > 0 %} error{% endif %}">{{ trace_result.defect_count }}</span>
                 </div>
             </div>
+            {%- if coverage_strip.len() > 0 -%}
+            <div class="coverage-strip">
+                {%- for (artifact_type, summary) in coverage_strip -%}
+                <span class="coverage-chip coverage-{{ summary.status }}" title="{{ artifact_type }}: {{ summary.covered }}/{{ summary.total }} covered">
+                    <span class="chip-type">{{ artifact_type }}</span>
+                    <span class="chip-value">{{ summary.covered }}/{{ summary.total }}</span>
+                </span>
+                {%- endfor -%}
+            </div>
+            {%- endif -%}
             {%- if trace_result.defect_count > 0 -%}
             <div class="defect-statistics">
                 <h3>Defect Breakdown</h3>
@@ -68,23 +81,39 @@
         {%- endif -%}
 
         <section class="specification-items">
-            <h2>Specification Items</h2>
+            <div class="items-header">
+                <h2>Specification Items</h2>
+                <div class="filter-bar">
+                    <input type="search" id="filter-input" placeholder="Filter by title, ID or alias…" aria-label="Filter items">
+                    <div class="filter-buttons" role="group" aria-label="Filter by status">
+                        <button type="button" data-filter="all" class="active">All</button>
+                        <button type="button" data-filter="defect">Defects</button>
+                        <button type="button" data-filter="uncovered">Uncovered</button>
+                        <button type="button" data-filter="partial">Partial</button>
+                        <button type="button" data-filter="covered">Covered</button>
+                    </div>
+                    <span class="filter-count" id="filter-count"></span>
+                </div>
+            </div>
             <div class="items-grid">
                 {%- for item in trace_result.items -%}
-                <div class="spec-item" id="{{ item.item.id.to_html_id() }}" data-req-id="{{ item.item.id }}">
+                <div class="spec-item status-{{ item.coverage_status }}{% if item.is_defect %} defect{% endif %}"
+                     id="{{ item.item.id.to_html_id() }}"
+                     data-req-id="{{ item.item.id }}"
+                     data-status="{{ item.coverage_status }}"
+                     data-defect="{% if item.is_defect %}true{% else %}false{% endif %}">
                     <div class="item-header">
-                        <h4 class="item-id">{{ item.item.id }}</h4>
-                        <div class="item-status">
-                            <span class="coverage-badge">{{ item.coverage_status }}</span>
-                        </div>
+                        <h4 class="item-title">{{ item.title() }}</h4>
+                        <span class="coverage-badge coverage-{{ item.coverage_status }}">{{ item.coverage_status }}</span>
                     </div>
-                    
+                    <div class="item-id-row">
+                        <code class="item-id-badge">{{ item.item.id }}</code>
+                        {%- for alias in item.item.aliases -%}
+                        <code class="alias-badge" title="Alias for {{ item.item.id }}">{{ alias }}</code>
+                        {%- endfor -%}
+                    </div>
+
                     <div class="item-content">
-                        {%- match item.item.title -%}
-                            {%- when Some with (title) -%}
-                                <h5 class="item-title">{{ title }}</h5>
-                            {%- when None -%}
-                        {%- endmatch -%}
                         {%- match item.item.description -%}
                             {%- when Some with (description) -%}
                                 <div class="item-description">{{ description|safe }}</div>
@@ -171,7 +200,7 @@
             </div>
         </section>
     </div>
-    
+
     <script>
         // [impl->req~html-compliant-anchors~1]
         // [impl->req~defect-requirement-linking~1]
@@ -180,7 +209,7 @@
             // Create a map of requirement ID to HTML-safe anchor ID
             const requirementElements = document.querySelectorAll('.spec-item');
             const idToAnchor = new Map();
-            
+
             requirementElements.forEach((element) => {
                 const reqId = element.getAttribute('data-req-id');
                 if (reqId) {
@@ -189,7 +218,7 @@
                     idToAnchor.set(reqId, anchorId);
                 }
             });
-            
+
             // Convert requirement text to links in metadata sections
             const requirementLinks = document.querySelectorAll('.requirement-link');
             requirementLinks.forEach(linkElement => {
@@ -203,7 +232,7 @@
                     linkElement.parentNode.replaceChild(anchor, linkElement);
                 }
             });
-            
+
             // Convert requirement IDs in defect descriptions to clickable links
             const defectDescriptions = document.querySelectorAll('.defect-description');
             defectDescriptions.forEach(descElement => {
@@ -218,7 +247,7 @@
                 });
                 descElement.innerHTML = html;
             });
-            
+
             // Convert covered needs types into hyperlinks to covering items
             const needsCoveredSpans = document.querySelectorAll('.needs-covered');
             needsCoveredSpans.forEach(span => {
@@ -231,11 +260,8 @@
                 const incomingRow = itemElement.querySelector('.metadata-row .metadata-label');
                 if (!incomingRow) return;
 
-                // Find covering items by looking at incoming links whose source matches the need type
-                const incomingLinks = itemElement.querySelectorAll('.link-covered');
                 // Build list of covering item IDs by matching artifact type against need type
                 const coveringIds = [];
-                const allLinks = itemElement.querySelectorAll('.requirement-link');
                 // Also search all spec items for items whose artifact type matches
                 requirementElements.forEach(el => {
                     const rid = el.getAttribute('data-req-id');
@@ -277,6 +303,44 @@
                     span.parentNode.replaceChild(anchor, span);
                 }
             });
+
+            // Filter bar: text filter + status filter over spec items
+            const filterInput = document.getElementById('filter-input');
+            const filterButtons = document.querySelectorAll('.filter-buttons button');
+            const filterCount = document.getElementById('filter-count');
+            let activeStatusFilter = 'all';
+
+            function applyFilter() {
+                const query = (filterInput ? filterInput.value : '').trim().toLowerCase();
+                let visible = 0;
+                requirementElements.forEach(el => {
+                    const matchesText = !query || el.textContent.toLowerCase().includes(query);
+                    let matchesStatus = true;
+                    if (activeStatusFilter === 'defect') {
+                        matchesStatus = el.getAttribute('data-defect') === 'true';
+                    } else if (activeStatusFilter !== 'all') {
+                        matchesStatus = el.getAttribute('data-status') === activeStatusFilter;
+                    }
+                    const show = matchesText && matchesStatus;
+                    el.style.display = show ? '' : 'none';
+                    if (show) visible++;
+                });
+                if (filterCount) {
+                    filterCount.textContent = visible + ' of ' + requirementElements.length + ' items';
+                }
+            }
+
+            if (filterInput) {
+                filterInput.addEventListener('input', applyFilter);
+            }
+            filterButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    activeStatusFilter = button.getAttribute('data-filter');
+                    filterButtons.forEach(b => b.classList.toggle('active', b === button));
+                    applyFilter();
+                });
+            });
+            applyFilter();
 
             // Add smooth scrolling
             document.querySelectorAll('a[href^="#"]').forEach(anchor => {

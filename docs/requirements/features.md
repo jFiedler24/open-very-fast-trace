@@ -83,3 +83,73 @@ This document defines the high-level features for the Open Very Fast Trace (OVFT
 **Tags:** error-handling, usability
 
 **Needs:** req
+
+---
+
+## feat~release-notes~1
+
+**Title:** Release notes from requirement coverage
+
+**Description:** The system shall generate release notes by comparing requirement coverage between a git tag and the current state, summarizing all newly covered requirements.
+
+**Rationale:** Release notes written by hand drift from what was actually delivered; deriving them from verified coverage keeps them truthful by construction.
+
+**Tags:** release, reporting, git
+
+**Needs:** req
+
+---
+
+## feat~readable-html-report~1
+
+**Title:** Human-readable HTML report
+
+**Description:** The HTML report shall lead with human-readable titles, show requirement IDs as secondary badges, summarize coverage per artifact type, and allow filtering items by text and status.
+
+**Rationale:** Reports are read by humans under time pressure; the requirement's meaning matters more than its machine ID.
+
+**Tags:** reporting, usability, html
+
+**Needs:** req
+
+---
+
+## feat~short-alias-ids~1
+
+**Title:** Short alias IDs for requirements
+
+**Description:** The system shall allow requirements to declare short external aliases (e.g. ticket keys like ABC-1234) that can be used as coverage tag targets in place of the full type~name~revision ID.
+
+**Rationale:** Teams tracking requirements in external tools (Jira, DOORS) need concise, stable references without giving up the canonical OVFT ID scheme.
+
+**Tags:** usability, interoperability, ids
+
+**Needs:** req
+
+---
+
+## feat~editor-tag-hiding~1
+
+**Title:** Hideable coverage tags in the editor
+
+**Description:** The VS Code extension shall collapse lines that contain only coverage tags into a subtle inline badge, revealing the raw tag while the cursor is on the line.
+
+**Rationale:** Raw tags are machine-readable metadata; hiding them by default keeps source files readable without giving up local traceability.
+
+**Tags:** usability, editor, vscode
+
+**Needs:** req
+
+---
+
+## feat~reqif-interchange~1
+
+**Title:** ReqIF import and export
+
+**Description:** The system shall import requirements from ReqIF files (the OMG interchange format used by DOORS, Polarion and similar tools) into markdown specs, and export its own items with their trace links as ReqIF for exchange with such tools.
+
+**Rationale:** Customers in regulated industries manage their requirements in ReqIF-based tools; interchange lets OVFT fit into that ecosystem without giving up markdown-native authoring.
+
+**Tags:** interoperability, reqif, import, export
+
+**Needs:** req

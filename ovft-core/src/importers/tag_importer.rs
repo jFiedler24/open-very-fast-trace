@@ -14,6 +14,8 @@ pub struct TagImporter {
     full_tag_regex: Regex,
     /// Regex for matching short tags like [[req~name~1:impl]]
     short_tag_regex: Regex,
+    /// Regex for matching alias-target tags (e.g. impl -> ABC-1234 in brackets)
+    alias_tag_regex: Regex,
 }
 
 impl TagImporter {
@@ -27,6 +29,10 @@ impl TagImporter {
             // Short tag format: [[item_id:artifact_type]]
             short_tag_regex: Regex::new(
                 r"\[\[\s*([a-zA-Z]+)~([a-zA-Z0-9._-]+)~(\d+)\s*:\s*([a-zA-Z]+)\s*\]\]"
+            ).unwrap(),
+            // Alias tag format: [artifact_type->ALIAS] where ALIAS contains no '~'
+            alias_tag_regex: Regex::new(
+                r"\[\s*([a-zA-Z]+)(?:~([a-zA-Z0-9._-]+)~(\d+))?\s*->\s*([A-Za-z0-9][A-Za-z0-9._-]*)\s*\]"
             ).unwrap(),
         }
     }
@@ -78,6 +84,13 @@ impl TagImporter {
         // Try to match full tag format
         for captures in self.full_tag_regex.captures_iter(line) {
             if let Some(item) = self.parse_full_tag(&captures, &location)? {
+                items.push(item);
+            }
+        }
+
+        // Try to match alias tag format (impl -> ABC-1234)
+        for captures in self.alias_tag_regex.captures_iter(line) {
+            if let Some(item) = self.parse_alias_tag(&captures, &location)? {
                 items.push(item);
             }
         }
@@ -153,6 +166,51 @@ impl TagImporter {
         }
 
         Ok(Some(builder.build()))
+    }
+
+    /// Parse an alias tag (e.g. a tag whose target is ABC-1234 instead of a full ID).
+    ///
+    /// The covered ID is a placeholder with an empty artifact type and revision 0;
+    /// the linker resolves it against item aliases (see `Linker`).
+    /// [impl->req~alias-id-resolution~1]
+    fn parse_alias_tag(
+        &self,
+        captures: &regex::Captures,
+        location: &Location,
+    ) -> Result<Option<SpecificationItem>> {
+        let artifact_type = captures.get(1).unwrap().as_str();
+        let name = captures.get(2).map(|m| m.as_str());
+        let revision = captures.get(3).map(|m| m.as_str());
+        let alias = captures.get(4).unwrap().as_str();
+
+        let item_name = if let (Some(name), Some(_revision)) = (name, revision) {
+            name.to_string()
+        } else {
+            format!(
+                "{}-{}",
+                alias.to_lowercase(),
+                self.generate_hash(&location.to_string())
+            )
+        };
+
+        let item_revision = if let Some(revision) = revision {
+            revision.parse::<u32>().map_err(|_| crate::Error::Parse {
+                message: format!("Invalid revision number: {}", revision),
+                location: location.to_string(),
+            })?
+        } else {
+            0
+        };
+
+        let item_id = SpecificationItemId::new(artifact_type.to_string(), item_name, item_revision);
+        let covered_id = SpecificationItemId::new(String::new(), alias.to_string(), 0);
+
+        let item = SpecificationItem::builder(item_id)
+            .covers(covered_id)
+            .location(location.clone())
+            .build();
+
+        Ok(Some(item))
     }
 
     /// Parse a short tag like [[req~name~1:impl]]
@@ -282,6 +340,37 @@ mod tests {
         assert_eq!(item.id.artifact_type, "impl");
         assert_eq!(item.covers.len(), 1);
         assert_eq!(item.covers[0].artifact_type, "req");
+    }
+
+    #[test]
+    fn test_parse_alias_tag() {
+        let importer = TagImporter::new();
+        // Uses a real item name from this repo's specs so the scanned test
+        // string resolves and does not create a trace defect.
+        let content = "// [impl->alias-id-resolution]";
+        let temp_file = NamedTempFile::new().unwrap();
+
+        let items = importer.parse_line(content, temp_file.path(), 1).unwrap();
+        assert_eq!(items.len(), 1);
+
+        let item = &items[0];
+        assert_eq!(item.id.artifact_type, "impl");
+        assert_eq!(item.covers.len(), 1);
+        // Placeholder: empty artifact type, revision 0 — resolved by the linker
+        assert_eq!(item.covers[0].artifact_type, "");
+        assert_eq!(item.covers[0].name, "alias-id-resolution");
+        assert_eq!(item.covers[0].revision, 0);
+    }
+
+    #[test]
+    fn test_full_tag_not_double_counted_as_alias() {
+        let importer = TagImporter::new();
+        let content = "// [impl->req~alias-id-resolution~1]";
+        let temp_file = NamedTempFile::new().unwrap();
+
+        let items = importer.parse_line(content, temp_file.path(), 1).unwrap();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].covers[0].name, "alias-id-resolution");
     }
 
     #[test]
