@@ -121,13 +121,13 @@ jobs:
       if: matrix.os != 'windows-latest'
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: gh release upload ${{ github.ref_name }} ./cargo-ovft-${{ github.ref_name }}-${{ matrix.target }}.tar.gz
+      run: gh release upload --clobber ${{ github.ref_name }} ./cargo-ovft-${{ github.ref_name }}-${{ matrix.target }}.tar.gz
 
     - name: Upload release assets (Windows)
       if: matrix.os == 'windows-latest'
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: gh release upload ${{ github.ref_name }} ./cargo-ovft-${{ github.ref_name }}-${{ matrix.target }}.zip
+      run: gh release upload --clobber ${{ github.ref_name }} ./cargo-ovft-${{ github.ref_name }}-${{ matrix.target }}.zip
 
   vscode-extension:
     name: Build and Upload VS Code Extension
@@ -159,13 +159,15 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       working-directory: ovft-vscode
-      run: gh release upload ${{ github.ref_name }} ovft-tracing-${{ github.ref_name }}.vsix
+      run: gh release upload --clobber ${{ github.ref_name }} ovft-tracing-${{ github.ref_name }}.vsix
 
   publish-crates:
     name: Publish to crates.io
     runs-on: ubuntu-latest
     needs: [create-release]
-    
+    env:
+      CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -177,11 +179,17 @@ jobs:
       uses: Swatinem/rust-cache@v2
 
     - name: Publish ovft-core to crates.io
-      run: cargo publish -p ovft-core --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
-      continue-on-error: true  # In case version already exists
+      if: env.CARGO_REGISTRY_TOKEN != ''
+      run: cargo publish -p ovft-core --token "$CARGO_REGISTRY_TOKEN"
 
     - name: Wait for crates.io propagation
+      if: env.CARGO_REGISTRY_TOKEN != ''
       run: sleep 60
 
     - name: Publish cargo-ovft to crates.io
-      run: cargo publish -p cargo-ovft --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+      if: env.CARGO_REGISTRY_TOKEN != ''
+      run: cargo publish -p cargo-ovft --token "$CARGO_REGISTRY_TOKEN"
+
+    - name: Skip publish (no CARGO_REGISTRY_TOKEN secret configured)
+      if: env.CARGO_REGISTRY_TOKEN == ''
+      run: echo "::warning::CARGO_REGISTRY_TOKEN secret is not set; skipping crates.io publish. Add it in repo Settings > Secrets and rerun this job."
