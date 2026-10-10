@@ -119,25 +119,15 @@ jobs:
 
     - name: Upload release assets (Unix)
       if: matrix.os != 'windows-latest'
-      uses: actions/upload-release-asset@v1
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ needs.create-release.outputs.upload_url }}
-        asset_path: ./cargo-ovft-${{ github.ref_name }}-${{ matrix.target }}.tar.gz
-        asset_name: cargo-ovft-${{ github.ref_name }}-${{ matrix.target }}.tar.gz
-        asset_content_type: application/gzip
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: gh release upload ${{ github.ref_name }} ./cargo-ovft-${{ github.ref_name }}-${{ matrix.target }}.tar.gz
 
     - name: Upload release assets (Windows)
       if: matrix.os == 'windows-latest'
-      uses: actions/upload-release-asset@v1
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ needs.create-release.outputs.upload_url }}
-        asset_path: ./cargo-ovft-${{ github.ref_name }}-${{ matrix.target }}.zip
-        asset_name: cargo-ovft-${{ github.ref_name }}-${{ matrix.target }}.zip
-        asset_content_type: application/zip
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: gh release upload ${{ github.ref_name }} ./cargo-ovft-${{ github.ref_name }}-${{ matrix.target }}.zip
 
   vscode-extension:
     name: Build and Upload VS Code Extension
@@ -166,19 +156,15 @@ jobs:
       run: npx vsce package --out ovft-tracing-${{ github.ref_name }}.vsix
 
     - name: Upload VSIX as release asset
-      uses: actions/upload-release-asset@v1
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ needs.create-release.outputs.upload_url }}
-        asset_path: ovft-vscode/ovft-tracing-${{ github.ref_name }}.vsix
-        asset_name: ovft-tracing-${{ github.ref_name }}.vsix
-        asset_content_type: application/octet-stream
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      working-directory: ovft-vscode
+      run: gh release upload ${{ github.ref_name }} ovft-tracing-${{ github.ref_name }}.vsix
 
   publish-crates:
     name: Publish to crates.io
     runs-on: ubuntu-latest
-    needs: [create-release, build-and-upload]
+    needs: [create-release]
     
     steps:
     - name: Checkout code
@@ -196,15 +182,6 @@ jobs:
 
     - name: Wait for crates.io propagation
       run: sleep 60
-
-    - name: Update cargo-ovft to use published ovft-core version
-      run: |
-        # Extract version from ovft-core/Cargo.toml
-        VERSION=$(grep '^version =' ovft-core/Cargo.toml | sed 's/version = "\(.*\)"/\1/')
-        echo "Using ovft-core version: $VERSION"
-        # Update cargo-ovft dependency
-        sed -i "s|ovft-core = { path = \"../ovft-core\" }|ovft-core = \"$VERSION\"|" cargo-ovft/Cargo.toml
-        cat cargo-ovft/Cargo.toml
 
     - name: Publish cargo-ovft to crates.io
       run: cargo publish -p cargo-ovft --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
