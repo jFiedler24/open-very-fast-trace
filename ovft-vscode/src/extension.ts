@@ -18,6 +18,7 @@
  */
 
 import * as vscode from "vscode";
+import { extractReqifXml } from "./reqifz";
 import { RequirementIndex, detectAtPosition, reqIdToString, parseReqId } from "./index";
 import {
   OvftDefinitionProvider,
@@ -384,12 +385,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         const picked = await vscode.window.showOpenDialog({
           title: "Import ReqIF",
           canSelectMany: false,
-          filters: { "ReqIF files": ["reqif"] },
+          filters: { "ReqIF files": ["reqif", "reqifz"] },
         });
         if (!picked || picked.length === 0) return;
 
         const inputUri = picked[0];
-        const content = Buffer.from(await vscode.workspace.fs.readFile(inputUri)).toString("utf-8");
+        const bytes = Buffer.from(await vscode.workspace.fs.readFile(inputUri));
+        const content = /\.reqifz$/i.test(inputUri.fsPath)
+          ? extractReqifXml(bytes)
+          : bytes.toString("utf-8");
 
         // eslint-disable-next-line @typescript-eslint/no-var-requires
         const wasm = require("../pkg/ovft_wasm");

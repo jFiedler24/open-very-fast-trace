@@ -21,3 +21,4 @@ serde_json = { workspace = true }
 toml = { workspace = true }
 env_logger = { workspace = true }
 anyhow = { workspace = true }
+zip = { workspace = true }

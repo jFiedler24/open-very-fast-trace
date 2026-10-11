@@ -342,10 +342,13 @@ fn run_reqif(matches: &ArgMatches) -> Result<()> {
 }
 
 /// Import a ReqIF XML file and write a markdown specification.
+///
+/// Accepts plain `.reqif` files as well as `.reqifz` archives (a ZIP
+/// container holding the `.reqif` document plus optional attachments).
 fn run_reqif_import(matches: &ArgMatches) -> Result<()> {
     let input = matches.get_one::<String>("file").unwrap();
     let input_path = PathBuf::from(input);
-    let xml = std::fs::read_to_string(&input_path)
+    let xml = read_reqif_xml(&input_path)
         .with_context(|| format!("Failed to read ReqIF file {}", input))?;
 
     let type_map: Vec<(String, String)> = match matches.get_one::<String>("map") {
@@ -432,4 +435,71 @@ fn find_cargo_project_root(start_dir: &Path) -> Option<PathBuf> {
     }
 
     None
+}
+
+/// Read a ReqIF document from a plain `.reqif` file or a `.reqifz` ZIP
+/// archive. For archives, the first entry ending in `.reqif` is used.
+/// [impl->req~reqif-import~1]
+fn read_reqif_xml(path: &Path) -> Result<String> {
+    let bytes = std::fs::read(path)?;
+    let is_zip = path
+        .extension()
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("reqifz"))
+        || bytes.starts_with(b"PK\x03\x04");
+    if !is_zip {
+        return String::from_utf8(bytes).context("ReqIF file is not valid UTF-8");
+    }
+    extract_reqif_from_zip(&bytes)
+        .with_context(|| format!("Failed to extract ReqIF document from archive {}", path.display()))
+}
+
+fn extract_reqif_from_zip(bytes: &[u8]) -> Result<String> {
+    let mut archive = zip::ZipArchive::new(std::io::Cursor::new(bytes))
+        .context("Not a valid ReqIFz ZIP archive")?;
+    for i in 0..archive.len() {
+        let mut entry = archive.by_index(i)?;
+        if entry.is_file() && entry.name().to_lowercase().ends_with(".reqif") {
+            let mut xml = String::new();
+            std::io::Read::read_to_string(&mut entry, &mut xml)
+                .context("Failed to read ReqIF entry from archive")?;
+            return Ok(xml);
+        }
+    }
+    anyhow::bail!("ReqIFz archive contains no .reqif document")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    fn build_reqifz(entries: &[(&str, &str)]) -> Vec<u8> {
+        let mut cursor = std::io::Cursor::new(Vec::new());
+        {
+            let mut writer = zip::ZipWriter::new(&mut cursor);
+            let options = zip::write::SimpleFileOptions::default();
+            for (name, content) in entries {
+                writer.start_file(*name, options).unwrap();
+                writer.write_all(content.as_bytes()).unwrap();
+            }
+            writer.finish().unwrap();
+        }
+        cursor.into_inner()
+    }
+
+    #[test]
+    fn extracts_reqif_entry_from_archive() {
+        let bytes = build_reqifz(&[
+            ("attachments/image.png", "not really png"),
+            ("spec.reqif", "<REQ-IF></REQ-IF>"),
+        ]);
+        assert_eq!(extract_reqif_from_zip(&bytes).unwrap(), "<REQ-IF></REQ-IF>");
+    }
+
+    #[test]
+    fn rejects_archive_without_reqif_entry() {
+        let bytes = build_reqifz(&[("readme.txt", "hello")]);
+        let err = extract_reqif_from_zip(&bytes).unwrap_err();
+        assert!(err.to_string().contains("no .reqif document"));
+    }
 }

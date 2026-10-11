@@ -24,6 +24,7 @@ anyhow = "1.0"
 log = "0.4"
 thiserror = "1.0"
 quick-xml = "0.31"
+zip = { version = "2", default-features = false, features = ["deflate"] }
 js-sys = "0.3"
 tempfile = "3.8"
 pretty_assertions = "1.4"
