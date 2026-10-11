@@ -133,6 +133,8 @@ jobs:
     name: Build and Upload VS Code Extension
     runs-on: ubuntu-latest
     needs: create-release
+    env:
+      VSCE_PAT: ${{ secrets.VSCE_PAT }}
 
     steps:
     - name: Checkout code
@@ -160,6 +162,15 @@ jobs:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       working-directory: ovft-vscode
       run: gh release upload --clobber ${{ github.ref_name }} ovft-tracing-${{ github.ref_name }}.vsix
+
+    - name: Publish to VS Code Marketplace
+      if: env.VSCE_PAT != ''
+      working-directory: ovft-vscode
+      run: npx vsce publish --packagePath ovft-tracing-${{ github.ref_name }}.vsix -p "$VSCE_PAT"
+
+    - name: Skip marketplace publish (no VSCE_PAT secret configured)
+      if: env.VSCE_PAT == ''
+      run: echo "::warning::VSCE_PAT secret is not set; skipping VS Code Marketplace publish. Add it in repo Settings > Secrets and rerun this job."
 
   publish-crates:
     name: Publish to crates.io
