@@ -230,6 +230,67 @@ The artifact types included are configurable via `release_note_types` in `.ovft.
 
 ---
 
+## Writing Readable Requirement Documents
+
+Headings like `## req~validate-credentials~1` are precise but hard to scan.
+Three mechanisms keep documents readable without giving up stable IDs:
+
+### 1. Human heading + ID on its own line (recommended)
+
+The heading does not have to carry the ID. Put a human-readable heading and
+the ID in backticks on the line directly below — the heading becomes the
+item's title:
+
+```markdown
+## Validate user credentials
+
+`req~validate-credentials~1`
+
+**Description:** The system shall validate username/password against the user database.
+
+**Covers:** feat~user-login~1
+**Needs:** dsn
+```
+
+The backtick ID line must stand alone (no other text). Inline mentions like
+``[`req~x~1`](other.md)`` in prose are cross-references, not definitions, so
+an item is still defined exactly once.
+
+### 2. The `**Title:**` field
+
+When the heading does carry the ID, declare the readable name explicitly —
+reports, release notes and the VS Code tree lead with the title and render
+the machine ID as a secondary badge:
+
+```markdown
+## req~validate-credentials~1
+
+**Title:** Validate user credentials
+```
+
+Without a title, it is derived from the ID name
+(`req~validate-credentials~1` → "Validate credentials").
+
+### 3. Aliases for short tags in code
+
+Declare ticket keys or customer references on the item and use them as tag
+targets instead of the full ID:
+
+```markdown
+**Aliases:** AUTH-42, JIRA-1007
+```
+
+```rust
+// [impl->AUTH-42]   resolves to req~validate-credentials~1
+```
+
+Aliases resolve case-insensitively to the newest revision. In VS Code, tag
+lines are hidden by default and shown as a subtle badge (toggle with
+**OVFT: Toggle Tag Visibility**), so tags stay out of the reader's way even
+in prose-heavy documents.
+
+---
+
 ## ReqIF Interchange
 
 Exchange with DOORS/Polarion-style tools via the OMG ReqIF format (ReqIF 1.0.1/1.1/1.2 and the pre-OMG RIF 1.1a/1.2 dialect are accepted; zipped .reqifz/.rifz containers are unpacked transparently):

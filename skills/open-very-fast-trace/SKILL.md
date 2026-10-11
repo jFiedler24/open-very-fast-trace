@@ -188,6 +188,29 @@ references); tags may then point at the alias instead of the full ID.
 An item ends at the next ID-carrying heading. Put `creq` files in their
 own document so ownership stays obvious.
 
+### Readable documents: keep the ID out of the heading
+
+The heading does not have to carry the ID. Prefer a human-readable heading
+with the ID in backticks on the line directly below — the heading becomes
+the item's title, and readers never see the machine ID:
+
+```markdown
+## Validate user credentials
+
+`req~validate-credentials~1`
+
+**Description:** The system shall validate username/password …
+**Covers:** feat~user-login~1
+**Needs:** dsn
+```
+
+Rules: the backtick ID line must stand alone; inline mentions like
+``[`req~x~1`](other.md)`` in prose are cross-references, not definitions
+(so an item is defined exactly once). When the heading does carry the ID
+(`## req~validate-credentials~1`), set `**Title:**` explicitly — reports,
+release notes and the VS Code tree lead with the title and show the ID as
+a badge.
+
 ## Defects and how to fix them
 
 `cargo ovft --check` reports these — always fix by editing links, not by
