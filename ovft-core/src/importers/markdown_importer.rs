@@ -157,13 +157,21 @@ impl MarkdownImporter {
         let location = Location::new(file_path.to_path_buf(), (*line_number + 1) as u32);
         let mut builder = SpecificationItem::builder(id).location(location);
 
-        // Look for title (if the ID is preceded by a heading, or extract from heading if ID is in heading)
-        if *line_number > 0 {
-            let prev_line = lines[*line_number - 1];
+        // Look for title: the nearest heading above the ID line becomes the
+        // title, skipping blank lines (readable style puts the human heading
+        // one blank line above the backtick ID line).
+        for back in (0..*line_number).rev() {
+            let prev_line = lines[back];
+            if prev_line.trim().is_empty() {
+                continue;
+            }
             if self.is_heading(prev_line) {
                 let title = self.extract_heading_text(prev_line);
-                builder = builder.title(title);
+                if !self.item_ref_regex.is_match(&title) {
+                    builder = builder.title(title);
+                }
             }
+            break;
         }
 
         // If ID is in a heading line itself, extract title from that line
@@ -212,13 +220,14 @@ impl MarkdownImporter {
                 *line_number -= 1; // Back up so the outer loop can process this
                 break;
             }
-            // Also check for specification items in headings
+            // Any heading ends the item: an ID-carrying heading starts the
+            // next item directly, and a plain (readable-style) heading starts
+            // the next section — its backtick ID line follows below. Without
+            // this break a readable heading would be swallowed into this
+            // item's description.
             if self.is_heading(line) {
-                let heading_text = self.extract_heading_text(line);
-                if self.item_ref_regex.is_match(&heading_text) {
-                    *line_number -= 1; // Back up so the outer loop can process this
-                    break;
-                }
+                *line_number -= 1; // Back up so the outer loop can process this
+                break;
             }
 
             // Check for section keywords
@@ -486,6 +495,67 @@ mod tests {
     use super::*;
     use std::io::Write;
     use tempfile::NamedTempFile;
+
+    #[test]
+    fn test_parse_readable_style_blank_line_between_heading_and_id() {
+        let importer = MarkdownImporter::new();
+        let content = r#"
+## Validate user credentials
+
+`req~validate-credentials~1`
+
+The system shall validate username/password against the user database.
+
+Needs: dsn
+
+## Session timeout
+
+`req~session-timeout~1`
+
+The system shall log out inactive users after 30 minutes.
+
+Needs: dsn
+"#;
+
+        let temp_file = NamedTempFile::new().unwrap();
+        let items = importer.parse_markdown(content, temp_file.path()).unwrap();
+        assert_eq!(items.len(), 2);
+
+        // The human heading is the title even with a blank line before the ID.
+        assert_eq!(
+            items[0].title.as_deref(),
+            Some("Validate user credentials")
+        );
+        assert_eq!(items[1].title.as_deref(), Some("Session timeout"));
+
+        // The next item's heading must not leak into this item's description.
+        let desc = items[0].description.as_deref().unwrap();
+        assert!(desc.contains("validate username/password"));
+        assert!(!desc.contains("Session timeout"), "desc: {:?}", desc);
+        assert_eq!(
+            items[1].description.as_deref().unwrap(),
+            "The system shall log out inactive users after 30 minutes."
+        );
+    }
+
+    #[test]
+    fn test_parse_id_heading_does_not_steal_title_from_backtick_item() {
+        let importer = MarkdownImporter::new();
+        let content = r#"
+## req~session-timeout~1
+
+**Title:** Session timeout
+
+The system shall log out inactive users after 30 minutes.
+
+Needs: dsn
+"#;
+
+        let temp_file = NamedTempFile::new().unwrap();
+        let items = importer.parse_markdown(content, temp_file.path()).unwrap();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].title.as_deref(), Some("Session timeout"));
+    }
 
     #[test]
     fn test_parse_simple_requirement() {
