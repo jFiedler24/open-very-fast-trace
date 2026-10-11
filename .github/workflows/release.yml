@@ -145,6 +145,18 @@ jobs:
       with:
         node-version: '20'
 
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: wasm32-unknown-unknown
+
+    - name: Install wasm-pack
+      run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+    - name: Build WASM module
+      working-directory: ovft-wasm
+      run: wasm-pack build --target nodejs --out-dir ../ovft-vscode/pkg
+
     - name: Install dependencies
       working-directory: ovft-vscode
       run: npm ci
