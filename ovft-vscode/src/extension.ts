@@ -385,13 +385,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         const picked = await vscode.window.showOpenDialog({
           title: "Import ReqIF",
           canSelectMany: false,
-          filters: { "ReqIF files": ["reqif", "reqifz"] },
+          filters: { "ReqIF/RIF files": ["reqif", "reqifz", "rif", "rifz"] },
         });
         if (!picked || picked.length === 0) return;
 
         const inputUri = picked[0];
         const bytes = Buffer.from(await vscode.workspace.fs.readFile(inputUri));
-        const content = /\.reqifz$/i.test(inputUri.fsPath)
+        const content = /\.(reqifz|rifz)$/i.test(inputUri.fsPath)
           ? extractReqifXml(bytes)
           : bytes.toString("utf-8");
 

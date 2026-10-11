@@ -12,10 +12,10 @@ interface ZipEntry {
 }
 
 /**
- * Extract the first `.reqif` document from a `.reqifz` ZIP archive.
- * Supports stored and deflated entries, which covers ReqIFz files in
- * the wild without pulling in a zip dependency.
- * [impl->req~reqif-import~1]
+ * Extract the first `.reqif` (or `.rif`) document from a `.reqifz`/`.rifz`
+ * ZIP archive. Supports stored and deflated entries, which covers ReqIFz
+ * files in the wild without pulling in a zip dependency.
+ * [impl->req~reqif-import~2]
  */
 export function extractReqifXml(data: Buffer): string {
   const min = Math.max(0, data.length - 22 - 0xffff);
@@ -50,10 +50,10 @@ export function extractReqifXml(data: Buffer): string {
   }
 
   const entry = entries.find(
-    (e) => e.name.toLowerCase().endsWith(".reqif") && !e.name.endsWith("/")
+    (e) => /\.(reqif|rif)$/i.test(e.name) && !e.name.endsWith("/")
   );
   if (!entry) {
-    throw new Error("ReqIFz archive contains no .reqif document");
+    throw new Error("Archive contains no .reqif or .rif document");
   }
 
   const lo = entry.localOffset;

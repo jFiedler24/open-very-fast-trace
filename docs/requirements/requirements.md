@@ -228,15 +228,15 @@ This document defines the detailed requirements for the Open Very Fast Trace (OV
 
 ---
 
-## req~reqif-import~1
+## req~reqif-import~2
 
-**Title:** Import ReqIF files as markdown specs
+**Title:** Import ReqIF/RIF files as markdown specs
 
-**Description:** The system shall parse ReqIF XML, map spec objects to items (artifact type from the object type via a configurable map, human-readable ID from the long name, ReqIF identifier kept as alias, XHTML text stripped to plain text), map relations to covers links, tolerate unknown elements, and render the result as a generated markdown spec document.
+**Description:** The system shall parse ReqIF and RIF XML (accepting the root elements REQ-IF and RIF and rejecting other XML documents), map spec objects to items (artifact type from the object type via a configurable map, stable canonical ID derived from the ReqIF identifier so renames in the source tool do not break trace links, title from the long name, identifier kept as alias, enumeration values resolved to their long names, XHTML text stripped to plain text without double-decoding entities), map relations to covers links, tolerate unknown elements, and render the result as a generated markdown spec document. Zipped containers (.reqifz/.rifz) shall be unpacked transparently.
 
 **Covers:** feat~reqif-interchange~1
 
-**Rationale:** Imported customer requirements become first-class traceable items while the generated file stays clearly marked as non-editable.
+**Rationale:** Imported customer requirements become first-class traceable items while the generated file stays clearly marked as non-editable. Identifier-derived IDs keep coverage tags valid across re-imports after the customer renames headings.
 
 **Tags:** interoperability, reqif, import
 

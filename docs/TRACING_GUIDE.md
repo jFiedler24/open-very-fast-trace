@@ -232,7 +232,7 @@ The artifact types included are configurable via `release_note_types` in `.ovft.
 
 ## ReqIF Interchange
 
-Exchange with DOORS/Polarion-style tools via the OMG ReqIF format:
+Exchange with DOORS/Polarion-style tools via the OMG ReqIF format (ReqIF 1.0.1/1.1/1.2 and the pre-OMG RIF 1.1a/1.2 dialect are accepted; zipped .reqifz/.rifz containers are unpacked transparently):
 
 ```bash
 # Import a customer spec: generates a markdown document with items,
@@ -242,11 +242,11 @@ cargo ovft reqif import customer.reqif --out docs/requirements/customer.md
 # Map the customer's type names onto your artifact types
 cargo ovft reqif import customer.reqif --map "Customer Requirement=creq,Requirement=req"
 
-# Export your items + trace links back to ReqIF
+# Export your items + trace links back to ReqIF (a ReqIF 1.1 document)
 cargo ovft reqif export --out trace.reqif
 ```
 
-Imported files are marked as generated — treat the ReqIF side as the source of truth for those items and re-import on change. Export is lossless for OVFT itself: re-importing an export yields the same canonical IDs.
+Canonical IDs of imported items derive from the stable ReqIF identifier (kept as an alias), so re-importing after the customer renames a heading does not break existing coverage tags. Imported files are marked as generated — treat the ReqIF side as the source of truth for those items and re-import on change. Export is lossless for OVFT itself: re-importing an export yields the same canonical IDs.
 
 ---
 

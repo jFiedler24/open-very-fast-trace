@@ -4,13 +4,19 @@
 //! This module maps ReqIF SPEC-OBJECTs to [`SpecificationItem`]s and back.
 //!
 //! Dialect notes / limitations:
+//! - Both dialect roots are accepted: `REQ-IF` (OMG ReqIF 1.0.1/1.1/1.2) and
+//!   `RIF` (pre-OMG RIF 1.1a/1.2). Any other root element is an error.
 //! - Only `ATTRIBUTE-VALUE-*` elements with a `THE-VALUE` / `THE-VALUE-XHTML`
 //!   payload are read; embedded binary blobs (`ATTRIBUTE-VALUE-EMBEDDED-DOCUMENT`)
-//!   and multi-value enumerations are skipped.
+//!   are skipped. Enumeration values (`ENUM-VALUE-REF`) are resolved to the
+//!   enum value's `LONG-NAME`.
 //! - The requirement text is located by resolving each value's attribute
 //!   definition reference to its `LONG-NAME` and matching, in priority order:
 //!   "ReqIF.Text", "Description", "Text" (case-insensitive). If none matches,
 //!   the first XHTML value is used, then the first plain value.
+//! - Canonical item ids are derived from the ReqIF `IDENTIFIER` (stable when
+//!   the source tool renames headings), never from the `LONG-NAME`; the
+//!   `LONG-NAME` becomes the item title.
 //! - `SPEC-RELATION`s are interpreted as coverage links: the SOURCE item covers
 //!   the TARGET item.
 //! - SPEC-HIERARCHY structure (chapters/ordering) and SPEC-RELATION-GROUPs are
@@ -64,53 +70,14 @@ fn slugify(s: &str) -> String {
     out
 }
 
-/// Decode the common XML/HTML entities and numeric character references.
-fn decode_entities(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    let mut rest = s;
-    while let Some(pos) = rest.find('&') {
-        out.push_str(&rest[..pos]);
-        rest = &rest[pos..];
-        let end = match rest.find(';') {
-            Some(e) if e <= 12 => e,
-            _ => {
-                out.push('&');
-                rest = &rest[1..];
-                continue;
-            }
-        };
-        let entity = &rest[1..end];
-        let decoded = match entity {
-            "amp" => Some('&'),
-            "lt" => Some('<'),
-            "gt" => Some('>'),
-            "quot" => Some('"'),
-            "apos" => Some('\''),
-            "nbsp" => Some(' '),
-            _ if entity.starts_with("#x") || entity.starts_with("#X") => {
-                u32::from_str_radix(&entity[2..], 16).ok().and_then(char::from_u32)
-            }
-            _ if entity.starts_with('#') => {
-                entity[1..].parse::<u32>().ok().and_then(char::from_u32)
-            }
-            _ => None,
-        };
-        match decoded {
-            Some(c) => out.push(c),
-            None => out.push_str(&rest[..=end]),
-        }
-        rest = &rest[end + 1..];
-    }
-    out.push_str(rest);
-    out
-}
-
 /// Internal line-break marker used while stripping XHTML, so that real
 /// newlines in the source (pure formatting) can collapse as whitespace.
 const LINE_BREAK: char = '\u{1}';
 
-/// Strip XHTML markup to plain text: block-level tags become newlines,
-/// entities are decoded, whitespace runs collapse to single spaces.
+/// Strip XHTML markup to plain text: block-level tags become newlines and
+/// whitespace runs collapse to single spaces. The input must already be
+/// entity-decoded (quick_xml unescapes text events before they reach us);
+/// decoding again here would corrupt literal text like `&lt;`.
 fn xhtml_to_text(xhtml: &str) -> String {
     // Replace block-level tags with break markers, drop all other tags.
     let mut marked = String::with_capacity(xhtml.len());
@@ -134,7 +101,7 @@ fn xhtml_to_text(xhtml: &str) -> String {
 
     marked
         .split(LINE_BREAK)
-        .map(|line| decode_entities(line).split_whitespace().collect::<Vec<_>>().join(" "))
+        .map(|line| line.split_whitespace().collect::<Vec<_>>().join(" "))
         .filter(|line| !line.is_empty())
         .collect::<Vec<_>>()
         .join("\n")
@@ -179,6 +146,8 @@ struct RawDocument {
     object_types: Vec<RawObjectType>,
     objects: Vec<RawObject>,
     relations: Vec<RawRelation>,
+    /// ENUM-VALUE IDENTIFIER → LONG-NAME, for resolving ENUM-VALUE-REFs.
+    enum_values: HashMap<String, String>,
 }
 
 /// Where simple text content of the current element should go.
@@ -189,6 +158,7 @@ enum TextTarget {
     RelationTarget,
     AttrDefRef,
     PlainValue,
+    EnumValueRef,
 }
 
 struct ParseState {
@@ -299,6 +269,14 @@ impl ParseState {
                     && self.current_value.is_some()
                 {
                     self.text_target = Some(TextTarget::PlainValue);
+                } else if name == "ENUM-VALUE-REF" && self.current_value.is_some() {
+                    self.text_target = Some(TextTarget::EnumValueRef);
+                } else if name == "ENUM-VALUE" {
+                    let id = get_attr(e, "IDENTIFIER").unwrap_or_default();
+                    let long_name = get_attr(e, "LONG-NAME").unwrap_or_default();
+                    if !id.is_empty() {
+                        self.doc.enum_values.insert(id, long_name);
+                    }
                 }
             }
         }
@@ -327,6 +305,20 @@ impl ParseState {
                     long_name: get_attr(e, "LONG-NAME").unwrap_or_default(),
                 });
             }
+        } else if name == "SPEC-OBJECT" {
+            // Empty-element objects (no VALUES/TYPE children) still import.
+            self.doc.objects.push(RawObject {
+                id: get_attr(e, "IDENTIFIER").unwrap_or_default(),
+                long_name: get_attr(e, "LONG-NAME").unwrap_or_default(),
+                type_ref: String::new(),
+                values: Vec::new(),
+            });
+        } else if name == "SPEC-OBJECT-TYPE" {
+            self.doc.object_types.push(RawObjectType {
+                id: get_attr(e, "IDENTIFIER").unwrap_or_default(),
+                long_name: get_attr(e, "LONG-NAME").unwrap_or_default(),
+                attr_defs: Vec::new(),
+            });
         } else if parent == "VALUES" && name.starts_with("ATTRIBUTE-VALUE-") {
             let value = RawValue {
                 attr_def_ref: None,
@@ -335,6 +327,12 @@ impl ParseState {
             };
             if let Some(obj) = self.current_object.as_mut() {
                 obj.values.push(value);
+            }
+        } else if name == "ENUM-VALUE" {
+            let id = get_attr(e, "IDENTIFIER").unwrap_or_default();
+            let long_name = get_attr(e, "LONG-NAME").unwrap_or_default();
+            if !id.is_empty() {
+                self.doc.enum_values.insert(id, long_name);
             }
         } else if self.xhtml_depth.is_some()
             && BLOCK_TAGS.contains(&name.to_lowercase().as_str())
@@ -372,6 +370,25 @@ impl ParseState {
             Some(TextTarget::PlainValue) => {
                 if let Some(v) = self.current_value.as_mut() {
                     v.text.push_str(text);
+                }
+            }
+            Some(TextTarget::EnumValueRef) => {
+                // Resolve the enumeration value reference to its LONG-NAME;
+                // keep the raw ref when the datatype definition is unknown.
+                let resolved = self
+                    .doc
+                    .enum_values
+                    .get(text.trim())
+                    .cloned()
+                    .unwrap_or_else(|| text.trim().to_string());
+                if resolved.is_empty() {
+                    return;
+                }
+                if let Some(v) = self.current_value.as_mut() {
+                    if !v.text.is_empty() {
+                        v.text.push_str(", ");
+                    }
+                    v.text.push_str(&resolved);
                 }
             }
             None => {}
@@ -446,19 +463,28 @@ impl ParseState {
 /// (e.g. "Customer Requirement" to "creq"); types not in the map get their
 /// `LONG-NAME` slugified (lowercase, non-alphanumeric runs become dashes).
 ///
-/// Objects whose `IDENTIFIER` is itself a canonical item id (as written by
+/// The root element must be `REQ-IF` (OMG ReqIF 1.0.1/1.1/1.2) or `RIF`
+/// (pre-OMG RIF 1.1a/1.2); any other XML document is rejected. Objects whose
+/// `IDENTIFIER` is itself a canonical item id (as written by
 /// [`export_reqif`]) keep that id verbatim, which makes export followed by
 /// import a lossless round-trip for ids. Unknown elements are skipped.
-/// [impl->req~reqif-import~1]
+/// [impl->req~reqif-import~2]
 pub fn import_reqif(xml: &str, type_map: &[(String, String)]) -> Result<Vec<SpecificationItem>> {
     let mut reader = Reader::from_str(xml);
     let mut state = ParseState::new();
+    let mut root_checked = false;
 
     loop {
         match reader.read_event() {
-            Ok(Event::Start(e)) => state.handle_start(&e),
+            Ok(Event::Start(e)) => {
+                check_root(&e, &mut root_checked)?;
+                state.handle_start(&e);
+            }
             Ok(Event::End(e)) => state.handle_end(e.name().as_ref()),
-            Ok(Event::Empty(e)) => state.handle_empty(&e),
+            Ok(Event::Empty(e)) => {
+                check_root(&e, &mut root_checked)?;
+                state.handle_empty(&e);
+            }
             Ok(Event::Text(t)) => {
                 let text = t
                     .unescape()
@@ -480,7 +506,27 @@ pub fn import_reqif(xml: &str, type_map: &[(String, String)]) -> Result<Vec<Spec
         }
     }
 
+    if !root_checked {
+        return Err(Error::ReqIf("Not a ReqIF/RIF document: empty input".to_string()));
+    }
+
     Ok(build_items(&state.doc, type_map))
+}
+
+/// The first element of the document must be a ReqIF or RIF root.
+fn check_root(e: &BytesStart, root_checked: &mut bool) -> Result<()> {
+    if *root_checked {
+        return Ok(());
+    }
+    *root_checked = true;
+    let name = local_name(e.name().as_ref()).to_string();
+    if name != "REQ-IF" && name != "RIF" {
+        return Err(Error::ReqIf(format!(
+            "Not a ReqIF/RIF document: root element is <{}>",
+            name
+        )));
+    }
+    Ok(())
 }
 
 /// Turn the parsed raw document into specification items.
@@ -508,7 +554,9 @@ fn build_items(doc: &RawDocument, type_map: &[(String, String)]) -> Vec<Specific
         // Objects carrying a canonical id in the OVFT.ID attribute (our own
         // exports, whose IDENTIFIER must be an NCName) round-trip verbatim;
         // older exports carry the canonical id as IDENTIFIER directly;
-        // everything else derives the id from the type and slugified name.
+        // everything else derives the id from the type and the slugified
+        // ReqIF IDENTIFIER — stable when the source tool renames a heading,
+        // unlike a LONG-NAME-derived id.
         let ovft_id = obj.values.iter().find_map(|v| {
             let name = v
                 .attr_def_ref
@@ -535,21 +583,18 @@ fn build_items(doc: &RawDocument, type_map: &[(String, String)]) -> Vec<Specific
                             slugify(&type_long_name)
                         }
                     });
-                let name = if obj.long_name.trim().is_empty() {
-                    slugify(&obj.id)
+                let name_source = if obj.id.trim().is_empty() {
+                    obj.long_name.trim()
                 } else {
-                    slugify(&obj.long_name)
+                    obj.id.trim()
                 };
-                SpecificationItemId::new(artifact_type, name, 1)
+                SpecificationItemId::new(artifact_type, slugify(name_source), 1)
             }
         };
 
         let description = pick_text_value(&obj.values, &attr_names).map(|v| {
-            if v.is_xhtml {
-                v.text.clone()
-            } else {
-                decode_entities(&v.text).trim().to_string()
-            }
+            // Text is already entity-decoded by quick_xml; just trim.
+            v.text.trim().to_string()
         });
 
         let mut builder = SpecificationItem::builder(id).aliases(vec![obj.id.clone()]);
@@ -711,7 +756,7 @@ pub fn export_reqif(items: &[SpecificationItem]) -> Result<String> {
     ));
     xml.push_str(&format!("      <CREATION-TIME>{}</CREATION-TIME>\n", now));
     xml.push_str("      <REQ-IF-TOOL-ID>open-very-fast-trace</REQ-IF-TOOL-ID>\n");
-    xml.push_str("      <REQ-IF-VERSION>1.0</REQ-IF-VERSION>\n");
+    xml.push_str("      <REQ-IF-VERSION>1.1</REQ-IF-VERSION>\n");
     xml.push_str("      <SOURCE-TOOL-ID>open-very-fast-trace</SOURCE-TOOL-ID>\n");
     xml.push_str("      <TITLE>Open Very Fast Trace export</TITLE>\n");
     xml.push_str("    </REQ-IF-HEADER>\n");
@@ -795,9 +840,16 @@ pub fn export_reqif(items: &[SpecificationItem]) -> Result<String> {
                 escape_xml(&item.id.artifact_type)
             ));
             xml.push_str("              </DEFINITION>\n");
+            // ReqIF 1.1 container; line breaks become <xhtml:br/> so
+            // paragraph structure survives the round-trip.
+            let xhtml = description
+                .split('\n')
+                .map(escape_xml)
+                .collect::<Vec<_>>()
+                .join("<xhtml:br/>");
             xml.push_str(&format!(
-                "              <THE-VALUE><xhtml:div>{}</xhtml:div></THE-VALUE>\n",
-                escape_xml(description)
+                "              <THE-VALUE-XHTML><xhtml:div>{}</xhtml:div></THE-VALUE-XHTML>\n",
+                xhtml
             ));
             xml.push_str("            </ATTRIBUTE-VALUE-XHTML>\n");
         }
@@ -855,8 +907,8 @@ pub fn export_reqif(items: &[SpecificationItem]) -> Result<String> {
 
 /// Render imported items as an OVFT markdown specification document.
 ///
-/// Each item becomes a `## <id>` section with its description, aliases and
-/// covers links, separated by horizontal rules. The output carries a
+/// Each item becomes a `## <id>` section with its title, description, aliases
+/// and covers links, separated by horizontal rules. The output carries a
 /// generated-file header naming the ReqIF source file.
 pub fn render_imported_markdown(source_file: &str, items: &[SpecificationItem]) -> String {
     let mut out = format!(
@@ -865,6 +917,9 @@ pub fn render_imported_markdown(source_file: &str, items: &[SpecificationItem]) 
     );
     for (index, item) in items.iter().enumerate() {
         out.push_str(&format!("## {}\n\n", item.id));
+        if let Some(title) = &item.title {
+            out.push_str(&format!("**Title:** {}\n\n", title));
+        }
         if let Some(description) = &item.description {
             out.push_str(description);
             out.push_str("\n\n");
@@ -1022,7 +1077,8 @@ mod tests {
         assert_eq!(items.len(), 3);
 
         let customer = &items[0];
-        assert_eq!(customer.id.to_string(), "creq~fast-login~1");
+        // Canonical id derives from the stable ReqIF IDENTIFIER, not the name.
+        assert_eq!(customer.id.to_string(), "creq~uuid-0001~1");
         assert_eq!(customer.title.as_deref(), Some("Fast Login"));
         assert_eq!(customer.aliases, vec!["_uuid-0001".to_string()]);
         let desc = customer.description.as_deref().unwrap();
@@ -1033,12 +1089,12 @@ mod tests {
         assert!(customer.covers.is_empty());
 
         let system = &items[1];
-        assert_eq!(system.id.to_string(), "system-requirement~auth-service~1");
+        assert_eq!(system.id.to_string(), "system-requirement~uuid-0002~1");
         assert_eq!(system.description.as_deref(), Some("Provide token based auth."));
         // The relation source covers the relation target.
         assert_eq!(
             system.covers,
-            vec![SpecificationItemId::parse("creq~fast-login~1").unwrap()]
+            vec![SpecificationItemId::parse("creq~uuid-0001~1").unwrap()]
         );
 
         let plain = &items[2];
@@ -1076,9 +1132,113 @@ mod tests {
         let items = import_reqif(xml, &[]).unwrap();
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].title.as_deref(), Some("Only Object"));
-        // Unknown type falls back to a slug; name slugified from LONG-NAME.
-        assert_eq!(items[0].id.name, "only-object");
+        // Unknown type falls back to a slug; name slugified from IDENTIFIER.
+        assert_eq!(items[0].id.name, "u1");
         assert_eq!(items[0].id.revision, 1);
+    }
+
+    #[test]
+    fn test_import_rif_dialect_root() {
+        // Pre-OMG RIF 1.1a/1.2: root element is RIF, XHTML rides in THE-VALUE.
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<RIF xmlns="http://www.omg.org/spec/ReqIF/20100401/rif.xsd">
+  <CORE-CONTENT>
+    <REQ-IF-CONTENT>
+      <SPEC-OBJECTS>
+        <SPEC-OBJECT IDENTIFIER="_rif-7" LONG-NAME="Old Format">
+          <VALUES>
+            <ATTRIBUTE-VALUE-XHTML>
+              <THE-VALUE><div xmlns="http://www.w3.org/1999/xhtml"><p>Legacy payload.</p></div></THE-VALUE>
+            </ATTRIBUTE-VALUE-XHTML>
+          </VALUES>
+        </SPEC-OBJECT>
+        <SPEC-OBJECT IDENTIFIER="_rif-8" LONG-NAME="Empty Object"/>
+      </SPEC-OBJECTS>
+    </REQ-IF-CONTENT>
+  </CORE-CONTENT>
+</RIF>"#;
+        let items = import_reqif(xml, &[]).unwrap();
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].id.to_string(), "rif-7~rif-7~1");
+        assert_eq!(items[0].description.as_deref(), Some("Legacy payload."));
+        // Empty-element objects import too.
+        assert_eq!(items[1].id.to_string(), "rif-8~rif-8~1");
+        assert_eq!(items[1].title.as_deref(), Some("Empty Object"));
+    }
+
+    #[test]
+    fn test_import_rejects_non_reqif_documents() {
+        let err = import_reqif("<html><body>not reqif</body></html>", &[]).unwrap_err();
+        assert!(err.to_string().contains("Not a ReqIF/RIF document"), "err: {}", err);
+        assert!(import_reqif("", &[]).is_err());
+    }
+
+    #[test]
+    fn test_import_does_not_double_decode_entities() {
+        // The source encodes a literal "&lt;" (written &amp;lt;). quick_xml
+        // decodes once; a second decode would corrupt it into "<".
+        let xml = r#"<?xml version="1.0"?>
+<REQ-IF xmlns="http://www.omg.org/spec/ReqIF/20110401/reqif.xsd">
+  <CORE-CONTENT><REQ-IF-CONTENT><SPEC-OBJECTS>
+    <SPEC-OBJECT IDENTIFIER="_e1" LONG-NAME="Entities">
+      <VALUES>
+        <ATTRIBUTE-VALUE-XHTML>
+          <THE-VALUE-XHTML><div xmlns="http://www.w3.org/1999/xhtml">Fish &amp;lt;Chips&gt; &amp; ale</div></THE-VALUE-XHTML>
+        </ATTRIBUTE-VALUE-XHTML>
+      </VALUES>
+    </SPEC-OBJECT>
+  </SPEC-OBJECTS></REQ-IF-CONTENT></CORE-CONTENT>
+</REQ-IF>"#;
+        let items = import_reqif(xml, &[]).unwrap();
+        assert_eq!(
+            items[0].description.as_deref(),
+            Some("Fish &lt;Chips> & ale")
+        );
+    }
+
+    #[test]
+    fn test_import_resolves_enumeration_values() {
+        let xml = r#"<?xml version="1.0"?>
+<REQ-IF xmlns="http://www.omg.org/spec/ReqIF/20110401/reqif.xsd">
+  <CORE-CONTENT><REQ-IF-CONTENT>
+    <DATATYPES>
+      <DATATYPE-DEFINITION-ENUMERATION IDENTIFIER="_dt-status" LONG-NAME="Status">
+        <SPECIFIED-VALUES>
+          <ENUM-VALUE IDENTIFIER="_ev-draft" LONG-NAME="Draft"/>
+          <ENUM-VALUE IDENTIFIER="_ev-approved" LONG-NAME="Approved"/>
+        </SPECIFIED-VALUES>
+      </DATATYPE-DEFINITION-ENUMERATION>
+    </DATATYPES>
+    <SPEC-TYPES>
+      <SPEC-OBJECT-TYPE IDENTIFIER="_sot" LONG-NAME="Requirement">
+        <SPEC-ATTRIBUTES>
+          <ATTRIBUTE-DEFINITION-ENUMERATION IDENTIFIER="_ad-status" LONG-NAME="Status"/>
+        </SPEC-ATTRIBUTES>
+      </SPEC-OBJECT-TYPE>
+    </SPEC-TYPES>
+    <SPEC-OBJECTS>
+      <SPEC-OBJECT IDENTIFIER="_s1" LONG-NAME="Enum Only">
+        <VALUES>
+          <ATTRIBUTE-VALUE-ENUMERATION>
+            <THE-VALUES>
+              <ENUM-VALUE-REF>_ev-approved</ENUM-VALUE-REF>
+            </THE-VALUES>
+            <DEFINITION>
+              <ATTRIBUTE-DEFINITION-ENUMERATION-REF>_ad-status</ATTRIBUTE-DEFINITION-ENUMERATION-REF>
+            </DEFINITION>
+          </ATTRIBUTE-VALUE-ENUMERATION>
+        </VALUES>
+        <TYPE><SPEC-OBJECT-TYPE-REF>_sot</SPEC-OBJECT-TYPE-REF></TYPE>
+      </SPEC-OBJECT>
+    </SPEC-OBJECTS>
+  </REQ-IF-CONTENT></CORE-CONTENT>
+</REQ-IF>"#;
+        let items = import_reqif(xml, &[("Requirement".to_string(), "req".to_string())]).unwrap();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].id.to_string(), "req~s1~1");
+        // The enum value resolves to its LONG-NAME and surfaces as the text
+        // fallback when no text attribute exists.
+        assert_eq!(items[0].description.as_deref(), Some("Approved"));
     }
 
     #[test]
@@ -1095,7 +1255,9 @@ mod tests {
         let items = vec![
             SpecificationItem::builder(creq_id.clone())
                 .title("Fast Login".to_string())
-                .description("The user shall log in quickly & securely.".to_string())
+                .description(
+                    "The user shall log in quickly & securely.\nSecond paragraph.".to_string(),
+                )
                 .aliases(vec!["_uuid-0001".to_string()])
                 .build(),
             SpecificationItem::builder(req_id.clone())
@@ -1111,6 +1273,8 @@ mod tests {
 
         let xml = export_reqif(&items).unwrap();
         assert!(xml.contains("xmlns=\"http://www.omg.org/spec/ReqIF/20110401/reqif.xsd\""));
+        assert!(xml.contains("<REQ-IF-VERSION>1.1</REQ-IF-VERSION>"));
+        assert!(xml.contains("<THE-VALUE-XHTML>"), "ReqIF 1.1 XHTML container");
 
         let reimported = import_reqif(&xml, &[]).unwrap();
         let original_ids: Vec<_> = items.iter().map(|i| i.id.to_string()).collect();
@@ -1127,10 +1291,10 @@ mod tests {
             .collect();
         assert_eq!(original_covers, roundtrip_covers);
 
-        // Descriptions survive the XHTML stripping.
+        // Descriptions survive the XHTML stripping, paragraph breaks included.
         assert_eq!(
             reimported[0].description.as_deref(),
-            Some("The user shall log in quickly & securely.")
+            Some("The user shall log in quickly & securely.\nSecond paragraph.")
         );
         // The ReqIF UUID alias is preserved.
         assert_eq!(reimported[0].aliases, vec!["_uuid-0001".to_string()]);
@@ -1151,11 +1315,13 @@ mod tests {
     #[test]
     fn test_xhtml_to_text() {
         assert_eq!(
-            xhtml_to_text("<div><p>Hello <b>world</b></p><p>Again &amp; more</p></div>"),
+            xhtml_to_text("<div><p>Hello <b>world</b></p><p>Again & more</p></div>"),
             "Hello world\nAgain & more"
         );
         assert_eq!(xhtml_to_text("no markup"), "no markup");
         assert_eq!(xhtml_to_text("<p>  spaced   out </p>"), "spaced out");
+        // Input arrives entity-decoded from quick_xml; entities must survive.
+        assert_eq!(xhtml_to_text("<p>Fish &lt;Chips></p>"), "Fish &lt;Chips>");
     }
 
     #[test]

@@ -103,7 +103,7 @@ fn main() -> Result<()> {
                                 .arg(
                                     Arg::new("file")
                                         .value_name("FILE")
-                                        .help("ReqIF XML file to import")
+                                        .help("ReqIF/RIF file to import (.reqif, .reqifz, .rif, .rifz)")
                                         .required(true),
                                 )
                                 .arg(
@@ -437,14 +437,17 @@ fn find_cargo_project_root(start_dir: &Path) -> Option<PathBuf> {
     None
 }
 
-/// Read a ReqIF document from a plain `.reqif` file or a `.reqifz` ZIP
-/// archive. For archives, the first entry ending in `.reqif` is used.
-/// [impl->req~reqif-import~1]
+/// Read a ReqIF document from a plain `.reqif`/`.rif` file or a
+/// `.reqifz`/`.rifz` ZIP archive. For archives, the first entry ending in
+/// `.reqif` or `.rif` is used.
+/// [impl->req~reqif-import~2]
 fn read_reqif_xml(path: &Path) -> Result<String> {
     let bytes = std::fs::read(path)?;
     let is_zip = path
         .extension()
-        .is_some_and(|ext| ext.eq_ignore_ascii_case("reqifz"))
+        .is_some_and(|ext| {
+            ext.eq_ignore_ascii_case("reqifz") || ext.eq_ignore_ascii_case("rifz")
+        })
         || bytes.starts_with(b"PK\x03\x04");
     if !is_zip {
         return String::from_utf8(bytes).context("ReqIF file is not valid UTF-8");
@@ -458,14 +461,15 @@ fn extract_reqif_from_zip(bytes: &[u8]) -> Result<String> {
         .context("Not a valid ReqIFz ZIP archive")?;
     for i in 0..archive.len() {
         let mut entry = archive.by_index(i)?;
-        if entry.is_file() && entry.name().to_lowercase().ends_with(".reqif") {
+        let name = entry.name().to_lowercase();
+        if entry.is_file() && (name.ends_with(".reqif") || name.ends_with(".rif")) {
             let mut xml = String::new();
             std::io::Read::read_to_string(&mut entry, &mut xml)
                 .context("Failed to read ReqIF entry from archive")?;
             return Ok(xml);
         }
     }
-    anyhow::bail!("ReqIFz archive contains no .reqif document")
+    anyhow::bail!("Archive contains no .reqif or .rif document")
 }
 
 #[cfg(test)]
@@ -500,6 +504,6 @@ mod tests {
     fn rejects_archive_without_reqif_entry() {
         let bytes = build_reqifz(&[("readme.txt", "hello")]);
         let err = extract_reqif_from_zip(&bytes).unwrap_err();
-        assert!(err.to_string().contains("no .reqif document"));
+        assert!(err.to_string().contains("no .reqif or .rif document"));
     }
 }
