@@ -34,6 +34,12 @@ artifact_types = ["creq", "feat", "req", "arch", "dsn",
 
 Run `cargo ovft` (HTML report, default `requirements_report.html`), or
 `cargo ovft --check` which exits non-zero on defects — the CI gate.
+`cargo ovft release-notes [--from <git-ref>]` summarizes requirements that
+became covered since a tag (default: latest tag) as markdown release notes.
+`cargo ovft reqif import <file> [--map "Customer Requirement=creq"]` turns a
+ReqIF document (`.reqif` or zipped `.reqifz`) into a generated markdown spec;
+`cargo ovft reqif export` writes items and trace links back out as ReqIF
+(round-trip preserves IDs).
 Config resolution: CLI flags > `--config file` > `.ovft.toml` > defaults.
 
 Optional build-time integration (report refreshed on every build, warning
@@ -104,17 +110,25 @@ On Windows that means both the OpenSSH agent and Pageant.
 ```markdown
 <!-- docs/requirements/connection.md — our derivation -->
 ## feat~silent-key-auth~1
-Connecting shall first try key-based authentication without prompting
-(ssh-agent, then default key files), falling back to the stored
-password only when key auth does not succeed.
+
+**Title:** Silent key-based authentication
+
+**Description:** Connecting shall first try key-based authentication
+without prompting (ssh-agent, then default key files), falling back to
+the stored password only when key auth does not succeed.
 
 **Covers:** creq~login-without-typing-passwords~1
 **Needs:** req, impl
 
 ## req~agent-auth~1
-Agent authentication shall support the platform ssh-agent: Unix domain
-socket via `SSH_AUTH_SOCK`, and on Windows the OpenSSH agent named pipe
-falling back to Pageant.
+
+**Title:** Platform ssh-agent authentication
+
+**Description:** Agent authentication shall support the platform
+ssh-agent: Unix domain socket via `SSH_AUTH_SOCK`, and on Windows the
+OpenSSH agent named pipe falling back to Pageant.
+
+**Aliases:** SSH-101
 
 **Covers:** feat~silent-key-auth~1
 **Needs:** impl
@@ -138,25 +152,38 @@ In source files (any comment, any language the regex sees):
 // [impl->req~agent-auth~1]            covers one item
 // [utest->req~log-highlighting~1]      a test verifying it
 // [impl->dsn~config-system~1]          design-level cover
+// [impl->ABC-1234]                     covers via alias (item declares **Aliases:** ABC-1234)
 // [[req~standalone-declaration~1]]     declare without link
 // [covers:req~legacy-format~1]         OFT-compatible alternate form
 ```
+
+Aliases resolve case-insensitively to the newest revision; unresolved aliases
+are reported as orphaned coverage.
 
 Multiple tags per line/file/function are fine.
 
 In markdown specs:
 
 ```markdown
-## req~some-requirement~1        ← heading carries the ID; body = description
+## req~some-requirement~1           ← heading carries the canonical ID
 
-Free-form description (the "shall" statement).
-
-**Needs:** impl, utest            ← artifact types that must cover this
-**Covers:** feat~parent-feature~1 ← items this derives from
-**Tags:** security, performance   ← free-form filter labels
-**Status:** approved              ← draft | proposed | approved | rejected
-**Rationale:** …                  ← why this exists
+**Title:** Short human-readable title  ← shown as the heading in the HTML
+                                          report and in release notes
+**Description:** The system shall …   ← the testable "shall" statement
+**Aliases:** ABC-1234, PROJ-77        ← short external IDs usable as tag targets
+**Needs:** impl, utest               ← artifact types that must cover this
+**Covers:** feat~parent-feature~1    ← items this derives from
+**Tags:** security, performance      ← free-form filter labels
+**Status:** approved                 ← draft | proposed | approved | rejected
+**Rationale:** …                     ← why this exists
 ```
+
+Always give an item a `**Title:**` — reports, release notes and the VS Code
+tree lead with the title and render the machine ID as a secondary badge.
+If the title is omitted it is derived from the ID name
+(`req~agent-auth~1` → "Agent auth"), which reads poorly for longer names.
+Declare `**Aliases:**` for IDs the outside world uses (ticket keys, customer
+references); tags may then point at the alias instead of the full ID.
 
 An item ends at the next ID-carrying heading. Put `creq` files in their
 own document so ownership stays obvious.
