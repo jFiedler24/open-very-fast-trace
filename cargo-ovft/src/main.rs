@@ -117,6 +117,12 @@ fn main() -> Result<()> {
                                         .long("map")
                                         .value_name("MAP")
                                         .help("Artifact type mapping, e.g. \"Customer Requirement=creq,Requirement=req\""),
+                                )
+                                .arg(
+                                    Arg::new("map-relation")
+                                        .long("map-relation")
+                                        .value_name("MAP")
+                                        .help("Relation direction mapping, e.g. \"satisfies=covers,satisfied-by=covered-by,conflicts=ignore\""),
                                 ),
                         )
                         .subcommand(
@@ -343,31 +349,32 @@ fn run_reqif(matches: &ArgMatches) -> Result<()> {
 
 /// Import a ReqIF XML file and write a markdown specification.
 ///
-/// Accepts plain `.reqif` files as well as `.reqifz` archives (a ZIP
-/// container holding the `.reqif` document plus optional attachments).
+/// Accepts plain `.reqif`/`.rif` files as well as `.reqifz`/`.rifz` archives
+/// (a ZIP container holding the ReqIF document plus optional attachments).
 fn run_reqif_import(matches: &ArgMatches) -> Result<()> {
     let input = matches.get_one::<String>("file").unwrap();
     let input_path = PathBuf::from(input);
     let xml = read_reqif_xml(&input_path)
         .with_context(|| format!("Failed to read ReqIF file {}", input))?;
 
-    let type_map: Vec<(String, String)> = match matches.get_one::<String>("map") {
-        Some(map) => map
-            .split(',')
-            .map(|pair| {
-                let (from, to) = pair.split_once('=').with_context(|| {
-                    format!(
-                        "Invalid --map entry '{}', expected format 'ReqIF Type=artifact-type'",
-                        pair
-                    )
-                })?;
-                Ok((from.trim().to_string(), to.trim().to_string()))
-            })
-            .collect::<Result<_>>()?,
-        None => Vec::new(),
+    let parse_map = |flag: &str, what: &str| -> Result<Vec<(String, String)>> {
+        match matches.get_one::<String>(flag) {
+            Some(map) => map
+                .split(',')
+                .map(|pair| {
+                    let (from, to) = pair.split_once('=').with_context(|| {
+                        format!("Invalid --{} entry '{}', expected format '{}'", flag, pair, what)
+                    })?;
+                    Ok((from.trim().to_string(), to.trim().to_string()))
+                })
+                .collect::<Result<_>>(),
+            None => Ok(Vec::new()),
+        }
     };
+    let type_map = parse_map("map", "ReqIF Type=artifact-type")?;
+    let relation_map = parse_map("map-relation", "Relation Type=covers|covered-by|ignore")?;
 
-    let items = ovft_core::reqif::import_reqif(&xml, &type_map)
+    let items = ovft_core::reqif::import_reqif(&xml, &type_map, &relation_map)
         .with_context(|| format!("Failed to parse ReqIF file {}", input))?;
 
     let markdown = ovft_core::reqif::render_imported_markdown(input, &items);

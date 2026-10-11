@@ -17,10 +17,13 @@
 //! - Canonical item ids are derived from the ReqIF `IDENTIFIER` (stable when
 //!   the source tool renames headings), never from the `LONG-NAME`; the
 //!   `LONG-NAME` becomes the item title.
-//! - `SPEC-RELATION`s are interpreted as coverage links: the SOURCE item covers
-//!   the TARGET item.
-//! - SPEC-HIERARCHY structure (chapters/ordering) and SPEC-RELATION-GROUPs are
-//!   not preserved.
+//! - `SPEC-RELATION`s become coverage links honoring the relation type:
+//!   "covers" (SOURCE covers TARGET, the default), "covered-by" (inverted)
+//!   or "ignore", configurable per relation type LONG-NAME.
+//! - All attribute values beyond the picked text survive as named item
+//!   attributes (e.g. Status, Priority).
+//! - Items are ordered like the first SPECIFICATION's hierarchy;
+//!   chapter nesting itself and SPEC-RELATION-GROUPs are not preserved.
 //! - Unknown elements and attributes are silently skipped, never an error.
 
 use crate::core::model::{SpecificationItem, SpecificationItemId};
@@ -139,6 +142,7 @@ struct RawObject {
 struct RawRelation {
     source: String,
     target: String,
+    type_ref: String,
 }
 
 #[derive(Debug, Default)]
@@ -148,6 +152,13 @@ struct RawDocument {
     relations: Vec<RawRelation>,
     /// ENUM-VALUE IDENTIFIER → LONG-NAME, for resolving ENUM-VALUE-REFs.
     enum_values: HashMap<String, String>,
+    /// SPEC-RELATION-TYPE IDENTIFIER → LONG-NAME.
+    relation_types: HashMap<String, String>,
+    /// Object identifiers in SPEC-HIERARCHY order (first SPECIFICATION),
+    /// used to order the imported items like the source document.
+    hierarchy_order: Vec<String>,
+    /// Accumulator for the current hierarchy object reference text.
+    scratch: String,
 }
 
 /// Where simple text content of the current element should go.
@@ -156,6 +167,8 @@ enum TextTarget {
     ObjectTypeRef,
     RelationSource,
     RelationTarget,
+    RelationTypeRef,
+    HierarchyObjectRef,
     AttrDefRef,
     PlainValue,
     EnumValueRef,
@@ -215,6 +228,13 @@ impl ParseState {
             "SPEC-RELATION" => {
                 self.current_relation = Some(RawRelation::default());
             }
+            "SPEC-RELATION-TYPE" => {
+                let id = get_attr(e, "IDENTIFIER").unwrap_or_default();
+                let long_name = get_attr(e, "LONG-NAME").unwrap_or_default();
+                if !id.is_empty() {
+                    self.doc.relation_types.insert(id, long_name);
+                }
+            }
             "THE-VALUE-XHTML" => {
                 self.xhtml_depth = Some(1);
                 self.xhtml_buf.clear();
@@ -236,12 +256,21 @@ impl ParseState {
                 }
             }
             "SPEC-OBJECT-REF" => {
-                if self.current_relation.is_some() {
+                if parent == "OBJECT" {
+                    // SPEC-HIERARCHY entry: remember document order.
+                    self.text_target = Some(TextTarget::HierarchyObjectRef);
+                    self.doc.scratch.clear();
+                } else if self.current_relation.is_some() {
                     self.text_target = match parent.as_str() {
                         "SOURCE" => Some(TextTarget::RelationSource),
                         "TARGET" => Some(TextTarget::RelationTarget),
                         _ => None,
                     };
+                }
+            }
+            "SPEC-RELATION-TYPE-REF" => {
+                if self.current_relation.is_some() {
+                    self.text_target = Some(TextTarget::RelationTypeRef);
                 }
             }
             _ => {
@@ -319,6 +348,12 @@ impl ParseState {
                 long_name: get_attr(e, "LONG-NAME").unwrap_or_default(),
                 attr_defs: Vec::new(),
             });
+        } else if name == "SPEC-RELATION-TYPE" {
+            let id = get_attr(e, "IDENTIFIER").unwrap_or_default();
+            let long_name = get_attr(e, "LONG-NAME").unwrap_or_default();
+            if !id.is_empty() {
+                self.doc.relation_types.insert(id, long_name);
+            }
         } else if parent == "VALUES" && name.starts_with("ATTRIBUTE-VALUE-") {
             let value = RawValue {
                 attr_def_ref: None,
@@ -361,6 +396,14 @@ impl ParseState {
                 if let Some(rel) = self.current_relation.as_mut() {
                     rel.target.push_str(text);
                 }
+            }
+            Some(TextTarget::RelationTypeRef) => {
+                if let Some(rel) = self.current_relation.as_mut() {
+                    rel.type_ref.push_str(text);
+                }
+            }
+            Some(TextTarget::HierarchyObjectRef) => {
+                self.doc.scratch.push_str(text);
             }
             Some(TextTarget::AttrDefRef) => {
                 if let Some(v) = self.current_value.as_mut() {
@@ -450,6 +493,15 @@ impl ParseState {
             }
         }
 
+        // Flush a completed hierarchy object reference.
+        if self.text_target == Some(TextTarget::HierarchyObjectRef) {
+            let id = self.doc.scratch.trim().to_string();
+            if !id.is_empty() {
+                self.doc.hierarchy_order.push(id);
+            }
+            self.doc.scratch.clear();
+        }
+
         // Text capture ends with the element that started it.
         if self.text_target.is_some() {
             self.text_target = None;
@@ -463,13 +515,21 @@ impl ParseState {
 /// (e.g. "Customer Requirement" to "creq"); types not in the map get their
 /// `LONG-NAME` slugified (lowercase, non-alphanumeric runs become dashes).
 ///
+/// `relation_map` maps SPEC-RELATION-TYPE `LONG-NAME`s to a direction:
+/// "covers" (the SOURCE item covers the TARGET item — the default for
+/// unmapped types), "covered-by" (inverted), or "ignore" (dropped).
+///
 /// The root element must be `REQ-IF` (OMG ReqIF 1.0.1/1.1/1.2) or `RIF`
 /// (pre-OMG RIF 1.1a/1.2); any other XML document is rejected. Objects whose
 /// `IDENTIFIER` is itself a canonical item id (as written by
 /// [`export_reqif`]) keep that id verbatim, which makes export followed by
 /// import a lossless round-trip for ids. Unknown elements are skipped.
 /// [impl->req~reqif-import~2]
-pub fn import_reqif(xml: &str, type_map: &[(String, String)]) -> Result<Vec<SpecificationItem>> {
+pub fn import_reqif(
+    xml: &str,
+    type_map: &[(String, String)],
+    relation_map: &[(String, String)],
+) -> Result<Vec<SpecificationItem>> {
     let mut reader = Reader::from_str(xml);
     let mut state = ParseState::new();
     let mut root_checked = false;
@@ -510,7 +570,7 @@ pub fn import_reqif(xml: &str, type_map: &[(String, String)]) -> Result<Vec<Spec
         return Err(Error::ReqIf("Not a ReqIF/RIF document: empty input".to_string()));
     }
 
-    Ok(build_items(&state.doc, type_map))
+    Ok(build_items(&state.doc, type_map, relation_map))
 }
 
 /// The first element of the document must be a ReqIF or RIF root.
@@ -530,7 +590,11 @@ fn check_root(e: &BytesStart, root_checked: &mut bool) -> Result<()> {
 }
 
 /// Turn the parsed raw document into specification items.
-fn build_items(doc: &RawDocument, type_map: &[(String, String)]) -> Vec<SpecificationItem> {
+fn build_items(
+    doc: &RawDocument,
+    type_map: &[(String, String)],
+    relation_map: &[(String, String)],
+) -> Vec<SpecificationItem> {
     // Global attribute definition id to LONG-NAME lookup (all spec object types).
     let attr_names: HashMap<&str, &str> = doc
         .object_types
@@ -592,12 +656,37 @@ fn build_items(doc: &RawDocument, type_map: &[(String, String)]) -> Vec<Specific
             }
         };
 
-        let description = pick_text_value(&obj.values, &attr_names).map(|v| {
+        let picked = pick_text_value(&obj.values, &attr_names);
+        let description = picked.map(|v| {
             // Text is already entity-decoded by quick_xml; just trim.
             v.text.trim().to_string()
         });
 
-        let mut builder = SpecificationItem::builder(id).aliases(vec![obj.id.clone()]);
+        // All other named values survive as attributes (Status, Priority …).
+        let picked_ptr = picked.map(|v| v as *const RawValue);
+        let mut attributes: Vec<(String, String)> = Vec::new();
+        for v in &obj.values {
+            let name = v
+                .attr_def_ref
+                .as_deref()
+                .and_then(|r| attr_names.get(r.trim()))
+                .map(|n| n.trim().to_string())
+                .unwrap_or_default();
+            let text = v.text.trim();
+            if name.is_empty() || name == "OVFT.ID" || text.is_empty() {
+                continue;
+            }
+            if picked_ptr == Some(v as *const RawValue) {
+                continue;
+            }
+            if !attributes.iter().any(|(n, _)| *n == name) {
+                attributes.push((name, text.to_string()));
+            }
+        }
+
+        let mut builder = SpecificationItem::builder(id)
+            .aliases(vec![obj.id.clone()])
+            .attributes(attributes);
         if !obj.long_name.trim().is_empty() {
             builder = builder.title(obj.long_name.trim().to_string());
         }
@@ -616,18 +705,56 @@ fn build_items(doc: &RawDocument, type_map: &[(String, String)]) -> Vec<Specific
         .collect();
 
     for rel in &doc.relations {
-        let (Some(source_id), Some(target_id)) = (
+        // Relation direction from the relation type's LONG-NAME: the map may
+        // declare "covers" (default), "covered-by" (inverted) or "ignore".
+        let type_name = doc
+            .relation_types
+            .get(rel.type_ref.trim())
+            .map(String::as_str)
+            .unwrap_or("");
+        let direction = relation_map
+            .iter()
+            .find(|(from, _)| from.eq_ignore_ascii_case(type_name.trim()))
+            .map(|(_, to)| to.trim().to_lowercase())
+            .unwrap_or_else(|| "covers".to_string());
+        if direction == "ignore" {
+            continue;
+        }
+        let (Some(mut covering), Some(mut covered)) = (
             id_by_identifier.get(rel.source.trim()),
             id_by_identifier.get(rel.target.trim()),
         ) else {
             continue;
         };
-        let (source_id, target_id) = (source_id.clone(), target_id.clone());
-        if let Some(source) = items.iter_mut().find(|i| i.id == source_id) {
-            if !source.covers.contains(&target_id) {
-                source.covers.push(target_id);
+        if direction == "covered-by" {
+            std::mem::swap(&mut covering, &mut covered);
+        }
+        let (covering_id, covered_id) = (covering.clone(), covered.clone());
+        if let Some(source) = items.iter_mut().find(|i| i.id == covering_id) {
+            if !source.covers.contains(&covered_id) {
+                source.covers.push(covered_id);
             }
         }
+    }
+
+    // Order items like the source document's first SPECIFICATION hierarchy;
+    // objects not referenced there keep their document order at the end.
+    if !doc.hierarchy_order.is_empty() {
+        let order: HashMap<&str, usize> = doc
+            .hierarchy_order
+            .iter()
+            .enumerate()
+            .map(|(i, id)| (id.as_str(), i))
+            .collect();
+        let mut indexed: Vec<(usize, SpecificationItem)> = items.into_iter().enumerate().collect();
+        indexed.sort_by_key(|(original, item)| {
+            let identifier = &item.aliases.first().cloned().unwrap_or_default();
+            (
+                order.get(identifier.as_str()).copied().unwrap_or(usize::MAX),
+                *original,
+            )
+        });
+        items = indexed.into_iter().map(|(_, item)| item).collect();
     }
 
     items
@@ -652,8 +779,25 @@ fn pick_text_value<'a>(
     }
     values
         .iter()
+        .filter(|v| {
+            // Never promote the round-trip id attribute to the description.
+            v.attr_def_ref
+                .as_deref()
+                .and_then(|r| attr_names.get(r.trim()))
+                .map_or(true, |n| n.trim() != "OVFT.ID")
+        })
         .find(|v| v.is_xhtml && !v.text.trim().is_empty())
-        .or_else(|| values.iter().find(|v| !v.text.trim().is_empty()))
+        .or_else(|| {
+            values
+                .iter()
+                .filter(|v| {
+                    v.attr_def_ref
+                        .as_deref()
+                        .and_then(|r| attr_names.get(r.trim()))
+                        .map_or(true, |n| n.trim() != "OVFT.ID")
+                })
+                .find(|v| !v.text.trim().is_empty())
+        })
 }
 
 /// Escape text for XML output (both element content and attribute values).
@@ -721,14 +865,23 @@ fn export_identifier(item: &SpecificationItem) -> String {
         .unwrap_or_else(|| item.id.to_string().replace('~', "_"))
 }
 
+/// Identifier of the attribute definition for a named item attribute within
+/// an artifact type's SPEC-OBJECT-TYPE.
+fn attr_def_id(name: &str, artifact_type: &str) -> String {
+    format!("ad-attr-{}-{}", slugify(name), artifact_type)
+}
+
 /// Export specification items as a ReqIF 1.1 XML document.
 ///
 /// Each artifact type becomes one SPEC-OBJECT-TYPE whose `LONG-NAME` is the
-/// artifact type verbatim, with a single XHTML attribute definition named
-/// "ReqIF.Text". Covers links become SPEC-RELATIONs (SOURCE covers TARGET).
+/// artifact type verbatim, with an XHTML attribute definition named
+/// "ReqIF.Text" plus one string attribute definition per named item
+/// attribute. Covers links become SPEC-RELATIONs (SOURCE covers TARGET), and
+/// all objects are listed in a single SPECIFICATION with a flat
+/// SPEC-HIERARCHY so importing tools show them as a module in order.
 /// Re-importing the output with [`import_reqif`] yields the same canonical
-/// ids and covers links.
-/// [impl->req~reqif-export~1]
+/// ids, covers links and attributes.
+/// [impl->req~reqif-export~2]
 pub fn export_reqif(items: &[SpecificationItem]) -> Result<String> {
     let now = iso8601_now();
     let export_id = format!("ovft-export-{}", unix_epoch_secs());
@@ -802,11 +955,39 @@ pub fn export_reqif(items: &[SpecificationItem]) -> Result<String> {
         xml.push_str("                <DATATYPE-DEFINITION-XHTML-REF>dt-xhtml</DATATYPE-DEFINITION-XHTML-REF>\n");
         xml.push_str("              </TYPE>\n");
         xml.push_str("            </ATTRIBUTE-DEFINITION-XHTML>\n");
+        // One string attribute definition per named item attribute.
+        let mut attr_names: Vec<&str> = Vec::new();
+        for item in items
+            .iter()
+            .filter(|i| i.id.artifact_type == *artifact_type)
+        {
+            for (name, _) in &item.attributes {
+                if !attr_names.contains(&name.as_str()) {
+                    attr_names.push(name);
+                }
+            }
+        }
+        for name in attr_names {
+            xml.push_str(&format!(
+                "            <ATTRIBUTE-DEFINITION-STRING IDENTIFIER=\"{}\" LONG-NAME=\"{}\" LAST-CHANGE=\"{}\">\n",
+                escape_xml(&attr_def_id(name, artifact_type)),
+                escape_xml(name),
+                now
+            ));
+            xml.push_str("              <TYPE>\n");
+            xml.push_str("                <DATATYPE-DEFINITION-STRING-REF>dt-string</DATATYPE-DEFINITION-STRING-REF>\n");
+            xml.push_str("              </TYPE>\n");
+            xml.push_str("            </ATTRIBUTE-DEFINITION-STRING>\n");
+        }
         xml.push_str("          </SPEC-ATTRIBUTES>\n");
         xml.push_str("        </SPEC-OBJECT-TYPE>\n");
     }
     xml.push_str(&format!(
         "        <SPEC-RELATION-TYPE IDENTIFIER=\"srt-covers\" LONG-NAME=\"covers\" LAST-CHANGE=\"{}\"/>\n",
+        now
+    ));
+    xml.push_str(&format!(
+        "        <SPECIFICATION-TYPE IDENTIFIER=\"spt-1\" LONG-NAME=\"OVFT Specification\" LAST-CHANGE=\"{}\"/>\n",
         now
     ));
     xml.push_str("      </SPEC-TYPES>\n");
@@ -853,6 +1034,19 @@ pub fn export_reqif(items: &[SpecificationItem]) -> Result<String> {
             ));
             xml.push_str("            </ATTRIBUTE-VALUE-XHTML>\n");
         }
+        for (name, value) in &item.attributes {
+            xml.push_str(&format!(
+                "            <ATTRIBUTE-VALUE-STRING THE-VALUE=\"{}\">\n",
+                escape_xml(value)
+            ));
+            xml.push_str("              <DEFINITION>\n");
+            xml.push_str(&format!(
+                "                <ATTRIBUTE-DEFINITION-STRING-REF>{}</ATTRIBUTE-DEFINITION-STRING-REF>\n",
+                escape_xml(&attr_def_id(name, &item.id.artifact_type))
+            ));
+            xml.push_str("              </DEFINITION>\n");
+            xml.push_str("            </ATTRIBUTE-VALUE-STRING>\n");
+        }
         xml.push_str("          </VALUES>\n");
         xml.push_str("          <TYPE>\n");
         xml.push_str(&format!(
@@ -896,7 +1090,36 @@ pub fn export_reqif(items: &[SpecificationItem]) -> Result<String> {
     }
     xml.push_str("      </SPEC-RELATIONS>\n");
 
+    // One SPECIFICATION with a flat hierarchy of all objects, so importing
+    // tools (DOORS, Polarion) present the export as a module in item order.
     xml.push_str("      <SPEC-RELATION-GROUPS/>\n");
+    xml.push_str("      <SPECIFICATIONS>\n");
+    xml.push_str(&format!(
+        "        <SPECIFICATION IDENTIFIER=\"spec-1\" LONG-NAME=\"OVFT Trace\" LAST-CHANGE=\"{}\">\n",
+        now
+    ));
+    xml.push_str("          <CHILDREN>\n");
+    for (index, item) in items.iter().enumerate() {
+        xml.push_str(&format!(
+            "            <SPEC-HIERARCHY IDENTIFIER=\"h-{}\" LAST-CHANGE=\"{}\">\n",
+            index + 1,
+            now
+        ));
+        xml.push_str("              <OBJECT>\n");
+        xml.push_str(&format!(
+            "                <SPEC-OBJECT-REF>{}</SPEC-OBJECT-REF>\n",
+            escape_xml(&export_identifier(item))
+        ));
+        xml.push_str("              </OBJECT>\n");
+        xml.push_str("            </SPEC-HIERARCHY>\n");
+    }
+    xml.push_str("          </CHILDREN>\n");
+    xml.push_str("          <TYPE>\n");
+    xml.push_str("            <SPECIFICATION-TYPE-REF>spt-1</SPECIFICATION-TYPE-REF>\n");
+    xml.push_str("          </TYPE>\n");
+    xml.push_str("        </SPECIFICATION>\n");
+    xml.push_str("      </SPECIFICATIONS>\n");
+
     xml.push_str("    </REQ-IF-CONTENT>\n");
     xml.push_str("  </CORE-CONTENT>\n");
     xml.push_str("  <TOOL-EXTENSIONS/>\n");
@@ -923,6 +1146,9 @@ pub fn render_imported_markdown(source_file: &str, items: &[SpecificationItem]) 
         if let Some(description) = &item.description {
             out.push_str(description);
             out.push_str("\n\n");
+        }
+        for (name, value) in &item.attributes {
+            out.push_str(&format!("**{}:** {}\n\n", name, value));
         }
         if !item.aliases.is_empty() {
             out.push_str(&format!("**Aliases:** {}\n\n", item.aliases.join(", ")));
@@ -1072,6 +1298,7 @@ mod tests {
         let items = import_reqif(
             SAMPLE_REQIF,
             &[("Customer Requirement".to_string(), "creq".to_string())],
+            &[],
         )
         .unwrap();
         assert_eq!(items.len(), 3);
@@ -1129,7 +1356,7 @@ mod tests {
     </reqif:REQ-IF-CONTENT>
   </reqif:CORE-CONTENT>
 </reqif:REQ-IF>"#;
-        let items = import_reqif(xml, &[]).unwrap();
+        let items = import_reqif(xml, &[], &[]).unwrap();
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].title.as_deref(), Some("Only Object"));
         // Unknown type falls back to a slug; name slugified from IDENTIFIER.
@@ -1157,7 +1384,7 @@ mod tests {
     </REQ-IF-CONTENT>
   </CORE-CONTENT>
 </RIF>"#;
-        let items = import_reqif(xml, &[]).unwrap();
+        let items = import_reqif(xml, &[], &[]).unwrap();
         assert_eq!(items.len(), 2);
         assert_eq!(items[0].id.to_string(), "rif-7~rif-7~1");
         assert_eq!(items[0].description.as_deref(), Some("Legacy payload."));
@@ -1168,9 +1395,9 @@ mod tests {
 
     #[test]
     fn test_import_rejects_non_reqif_documents() {
-        let err = import_reqif("<html><body>not reqif</body></html>", &[]).unwrap_err();
+        let err = import_reqif("<html><body>not reqif</body></html>", &[], &[]).unwrap_err();
         assert!(err.to_string().contains("Not a ReqIF/RIF document"), "err: {}", err);
-        assert!(import_reqif("", &[]).is_err());
+        assert!(import_reqif("", &[], &[]).is_err());
     }
 
     #[test]
@@ -1189,7 +1416,7 @@ mod tests {
     </SPEC-OBJECT>
   </SPEC-OBJECTS></REQ-IF-CONTENT></CORE-CONTENT>
 </REQ-IF>"#;
-        let items = import_reqif(xml, &[]).unwrap();
+        let items = import_reqif(xml, &[], &[]).unwrap();
         assert_eq!(
             items[0].description.as_deref(),
             Some("Fish &lt;Chips> & ale")
@@ -1233,7 +1460,7 @@ mod tests {
     </SPEC-OBJECTS>
   </REQ-IF-CONTENT></CORE-CONTENT>
 </REQ-IF>"#;
-        let items = import_reqif(xml, &[("Requirement".to_string(), "req".to_string())]).unwrap();
+        let items = import_reqif(xml, &[("Requirement".to_string(), "req".to_string())], &[]).unwrap();
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].id.to_string(), "req~s1~1");
         // The enum value resolves to its LONG-NAME and surfaces as the text
@@ -1242,8 +1469,122 @@ mod tests {
     }
 
     #[test]
+    fn test_import_relation_direction_mapping() {
+        let xml = r#"<?xml version="1.0"?>
+<REQ-IF xmlns="http://www.omg.org/spec/ReqIF/20110401/reqif.xsd">
+  <CORE-CONTENT><REQ-IF-CONTENT>
+    <SPEC-TYPES>
+      <SPEC-RELATION-TYPE IDENTIFIER="_srt-sat" LONG-NAME="satisfied-by"/>
+      <SPEC-RELATION-TYPE IDENTIFIER="_srt-dep" LONG-NAME="depends-on"/>
+    </SPEC-TYPES>
+    <SPEC-OBJECTS>
+      <SPEC-OBJECT IDENTIFIER="_a" LONG-NAME="A"/>
+      <SPEC-OBJECT IDENTIFIER="_b" LONG-NAME="B"/>
+      <SPEC-OBJECT IDENTIFIER="_c" LONG-NAME="C"/>
+    </SPEC-OBJECTS>
+    <SPEC-RELATIONS>
+      <SPEC-RELATION IDENTIFIER="_r1">
+        <SOURCE><SPEC-OBJECT-REF>_a</SPEC-OBJECT-REF></SOURCE>
+        <TARGET><SPEC-OBJECT-REF>_b</SPEC-OBJECT-REF></TARGET>
+        <TYPE><SPEC-RELATION-TYPE-REF>_srt-sat</SPEC-RELATION-TYPE-REF></TYPE>
+      </SPEC-RELATION>
+      <SPEC-RELATION IDENTIFIER="_r2">
+        <SOURCE><SPEC-OBJECT-REF>_a</SPEC-OBJECT-REF></SOURCE>
+        <TARGET><SPEC-OBJECT-REF>_c</SPEC-OBJECT-REF></TARGET>
+        <TYPE><SPEC-RELATION-TYPE-REF>_srt-dep</SPEC-RELATION-TYPE-REF></TYPE>
+      </SPEC-RELATION>
+    </SPEC-RELATIONS>
+  </REQ-IF-CONTENT></CORE-CONTENT>
+</REQ-IF>"#;
+        let map = [
+            ("satisfied-by".to_string(), "covered-by".to_string()),
+            ("depends-on".to_string(), "ignore".to_string()),
+        ];
+        let items = import_reqif(xml, &[], &map).unwrap();
+        let a = &items[0];
+        let b = &items[1];
+        let c = &items[2];
+        // satisfied-by is inverted: the target covers the source.
+        assert_eq!(b.covers, vec![a.id.clone()]);
+        // depends-on is ignored entirely.
+        assert!(a.covers.is_empty());
+        assert!(c.covers.is_empty());
+    }
+
+    #[test]
+    fn test_import_preserves_attributes() {
+        let items = import_reqif(
+            SAMPLE_REQIF,
+            &[("Customer Requirement".to_string(), "creq".to_string())],
+            &[],
+        )
+        .unwrap();
+        // The Status attribute of the first object survives alongside the
+        // picked ReqIF.Text description.
+        assert_eq!(
+            items[0].attributes,
+            vec![("Status".to_string(), "approved".to_string())]
+        );
+    }
+
+    #[test]
+    fn test_import_orders_by_specification_hierarchy() {
+        let xml = r#"<?xml version="1.0"?>
+<REQ-IF xmlns="http://www.omg.org/spec/ReqIF/20110401/reqif.xsd">
+  <CORE-CONTENT><REQ-IF-CONTENT>
+    <SPEC-OBJECTS>
+      <SPEC-OBJECT IDENTIFIER="_a" LONG-NAME="First Declared"/>
+      <SPEC-OBJECT IDENTIFIER="_b" LONG-NAME="Second Declared"/>
+      <SPEC-OBJECT IDENTIFIER="_c" LONG-NAME="Not In Hierarchy"/>
+    </SPEC-OBJECTS>
+    <SPECIFICATIONS>
+      <SPECIFICATION IDENTIFIER="_spec" LONG-NAME="Doc">
+        <CHILDREN>
+          <SPEC-HIERARCHY IDENTIFIER="_h1">
+            <OBJECT><SPEC-OBJECT-REF>_b</SPEC-OBJECT-REF></OBJECT>
+          </SPEC-HIERARCHY>
+          <SPEC-HIERARCHY IDENTIFIER="_h2">
+            <OBJECT><SPEC-OBJECT-REF>_a</SPEC-OBJECT-REF></OBJECT>
+          </SPEC-HIERARCHY>
+        </CHILDREN>
+        <TYPE><SPECIFICATION-TYPE-REF>_spt</SPECIFICATION-TYPE-REF></TYPE>
+      </SPECIFICATION>
+    </SPECIFICATIONS>
+  </REQ-IF-CONTENT></CORE-CONTENT>
+</REQ-IF>"#;
+        let items = import_reqif(xml, &[], &[]).unwrap();
+        let order: Vec<String> = items.iter().map(|i| i.id.to_string()).collect();
+        assert_eq!(order, vec!["b~b~1", "a~a~1", "c~c~1"]);
+    }
+
+    #[test]
+    fn test_export_import_round_trip_preserves_attributes() {
+        let req_id = SpecificationItemId::parse("req~auth~1").unwrap();
+        let items = vec![SpecificationItem::builder(req_id)
+            .description("Do auth.".to_string())
+            .attribute("Status".to_string(), "approved".to_string())
+            .attribute("Priority".to_string(), "high".to_string())
+            .build()];
+
+        let xml = export_reqif(&items).unwrap();
+        assert!(xml.contains("<SPECIFICATIONS>"), "module structure present");
+        assert!(xml.contains("SPEC-HIERARCHY"), "hierarchy present");
+
+        let reimported = import_reqif(&xml, &[], &[]).unwrap();
+        assert_eq!(reimported.len(), 1);
+        assert_eq!(
+            reimported[0].attributes,
+            vec![
+                ("Status".to_string(), "approved".to_string()),
+                ("Priority".to_string(), "high".to_string()),
+            ]
+        );
+        assert_eq!(reimported[0].description.as_deref(), Some("Do auth."));
+    }
+
+    #[test]
     fn test_import_reqif_invalid_xml_errors() {
-        assert!(import_reqif("<REQ-IF><a></b></REQ-IF>", &[]).is_err());
+        assert!(import_reqif("<REQ-IF><a></b></REQ-IF>", &[], &[]).is_err());
     }
 
     #[test]
@@ -1276,7 +1617,7 @@ mod tests {
         assert!(xml.contains("<REQ-IF-VERSION>1.1</REQ-IF-VERSION>"));
         assert!(xml.contains("<THE-VALUE-XHTML>"), "ReqIF 1.1 XHTML container");
 
-        let reimported = import_reqif(&xml, &[]).unwrap();
+        let reimported = import_reqif(&xml, &[], &[]).unwrap();
         let original_ids: Vec<_> = items.iter().map(|i| i.id.to_string()).collect();
         let roundtrip_ids: Vec<_> = reimported.iter().map(|i| i.id.to_string()).collect();
         assert_eq!(original_ids, roundtrip_ids);

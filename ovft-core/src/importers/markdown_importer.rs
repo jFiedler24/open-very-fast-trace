@@ -37,6 +37,8 @@ pub struct MarkdownImporter {
     rationale_field_regex: Regex,
     /// Regex for matching aliases fields like "**Aliases:** ABC-1234, JIRA-77"
     aliases_field_regex: Regex,
+    /// Regex for matching generic attribute fields like "**Priority:** High"
+    attribute_field_regex: Regex,
 }
 
 impl MarkdownImporter {
@@ -60,6 +62,10 @@ impl MarkdownImporter {
             description_field_regex: Regex::new(r"(?i)^\*?\*?Description:\*?\*?\s*(.+)$").unwrap(),
             rationale_field_regex: Regex::new(r"(?i)^\*?\*?Rationale:\*?\*?\s*(.+)$").unwrap(),
             aliases_field_regex: Regex::new(r"(?i)^\*?\*?Aliases?:\*?\*?\s*(.+)$").unwrap(),
+            // Generic "**Key:** value" pairs; the known fields above are
+            // matched first in the parse chain, so only extra attributes
+            // (Status, Priority, …) land here.
+            attribute_field_regex: Regex::new(r"^\*\*([^*]+):\*\*\s*(.+)$").unwrap(),
         }
     }
 
@@ -269,6 +275,14 @@ impl MarkdownImporter {
                     _ => ItemStatus::Approved,
                 };
                 builder = builder.status(status);
+            } else if let Some(captures) = self.attribute_field_regex.captures(line) {
+                // Generic "**Key:** value" pairs not claimed by the known
+                // fields above are preserved as named attributes.
+                let name = captures.get(1).unwrap().as_str().trim();
+                let value = captures.get(2).unwrap().as_str().trim();
+                if !name.is_empty() && !value.is_empty() {
+                    builder = builder.attribute(name.to_string(), value.to_string());
+                }
             } else if self.rationale_regex.is_match(line) {
                 current_section = Section::Rationale;
             } else if self.comment_regex.is_match(line) {
@@ -607,6 +621,39 @@ Needs: impl
         let item = &items[0];
         assert_eq!(item.aliases, vec!["ABC-1234", "JIRA-77"]);
         assert!(!item.description.as_ref().unwrap().contains("ABC-1234"));
+    }
+
+    #[test]
+    fn test_parse_generic_attribute_fields() {
+        let importer = MarkdownImporter::new();
+        let content = r#"
+## req~agent-auth~1
+
+The system shall support agent authentication.
+
+**Status:** approved
+**Priority:** High
+**Verification Method:** Test
+
+Needs: impl
+"#;
+
+        let temp_file = NamedTempFile::new().unwrap();
+        let items = importer.parse_markdown(content, temp_file.path()).unwrap();
+        assert_eq!(items.len(), 1);
+
+        let item = &items[0];
+        // Known fields stay in their dedicated slots…
+        assert_eq!(item.status, ItemStatus::Approved);
+        // …and the rest are preserved as named attributes, not description.
+        assert_eq!(
+            item.attributes,
+            vec![
+                ("Priority".to_string(), "High".to_string()),
+                ("Verification Method".to_string(), "Test".to_string()),
+            ]
+        );
+        assert!(!item.description.as_ref().unwrap().contains("Priority"));
     }
 
     #[test]

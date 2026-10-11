@@ -50,6 +50,8 @@ pub struct JsLinkedItem {
     pub title: Option<String>,
     pub description: Option<String>,
     pub aliases: Vec<String>,
+    #[serde(default)]
+    pub attributes: Vec<(String, String)>,
     pub needs: Vec<String>,
     pub covers: Vec<String>,
     pub depends: Vec<String>,
@@ -89,6 +91,7 @@ fn to_js_linked_item(item: &LinkedSpecificationItem) -> JsLinkedItem {
         title: item.item.title.clone(),
         description: item.item.description.clone(),
         aliases: item.item.aliases.clone(),
+        attributes: item.item.attributes.clone(),
         needs: item.item.needs.clone(),
         covers: item.item.covers.iter().map(|c| c.to_string()).collect(),
         depends: item.item.depends.iter().map(|d| d.to_string()).collect(),
@@ -250,17 +253,23 @@ pub fn render_html_report(trace_result_json: &str) -> std::result::Result<String
 
 /// Import a ReqIF XML document and return it as an OVFT markdown
 /// specification. `type_map_json` is a JSON array of `[from, to]` string
-/// pairs mapping ReqIF type names to artifact types (empty string or "[]"
-/// means no mapping).
+/// pairs mapping ReqIF type names to artifact types; `relation_map_json` is
+/// the same shape, mapping relation type names to "covers", "covered-by" or
+/// "ignore" (empty string or "[]" means default handling).
 #[wasm_bindgen]
-pub fn import_reqif_to_markdown(xml: &str, type_map_json: &str) -> std::result::Result<String, JsValue> {
+pub fn import_reqif_to_markdown(xml: &str, type_map_json: &str, relation_map_json: &str) -> std::result::Result<String, JsValue> {
     let type_map: Vec<(String, String)> = if type_map_json.trim().is_empty() {
         Vec::new()
     } else {
         serde_json::from_str(type_map_json).map_err(|e| JsValue::from_str(&e.to_string()))?
     };
+    let relation_map: Vec<(String, String)> = if relation_map_json.trim().is_empty() {
+        Vec::new()
+    } else {
+        serde_json::from_str(relation_map_json).map_err(|e| JsValue::from_str(&e.to_string()))?
+    };
 
-    let items = import_reqif(xml, &type_map).map_err(|e| JsValue::from_str(&e.to_string()))?;
+    let items = import_reqif(xml, &type_map, &relation_map).map_err(|e| JsValue::from_str(&e.to_string()))?;
     Ok(render_imported_markdown("ReqIF import", &items))
 }
 
@@ -283,6 +292,7 @@ pub fn export_reqif_from_trace(trace_result_json: &str) -> std::result::Result<S
                 .collect();
             let mut builder = SpecificationItem::builder(id)
                 .aliases(ji.aliases.clone())
+                .attributes(ji.attributes.clone())
                 .covers_multiple(covers);
             if let Some(ref t) = ji.title {
                 builder = builder.title(t.clone());

@@ -232,7 +232,7 @@ This document defines the detailed requirements for the Open Very Fast Trace (OV
 
 **Title:** Import ReqIF/RIF files as markdown specs
 
-**Description:** The system shall parse ReqIF and RIF XML (accepting the root elements REQ-IF and RIF and rejecting other XML documents), map spec objects to items (artifact type from the object type via a configurable map, stable canonical ID derived from the ReqIF identifier so renames in the source tool do not break trace links, title from the long name, identifier kept as alias, enumeration values resolved to their long names, XHTML text stripped to plain text without double-decoding entities), map relations to covers links, tolerate unknown elements, and render the result as a generated markdown spec document. Zipped containers (.reqifz/.rifz) shall be unpacked transparently.
+**Description:** The system shall parse ReqIF and RIF XML (accepting the root elements REQ-IF and RIF and rejecting other XML documents), map spec objects to items (artifact type from the object type via a configurable map, stable canonical ID derived from the ReqIF identifier so renames in the source tool do not break trace links, title from the long name, identifier kept as alias, enumeration values resolved to their long names, XHTML text stripped to plain text without double-decoding entities), preserve all remaining attribute values as named item attributes, map relations to covers links honoring the relation type's direction via a configurable map (covers / covered-by / ignore), order items like the source document's specification hierarchy, tolerate unknown elements, and render the result as a generated markdown spec document. Zipped containers (.reqifz/.rifz) shall be unpacked transparently.
 
 **Covers:** feat~reqif-interchange~1
 
@@ -244,15 +244,15 @@ This document defines the detailed requirements for the Open Very Fast Trace (OV
 
 ---
 
-## req~reqif-export~1
+## req~reqif-export~2
 
 **Title:** Export traced items as ReqIF
 
-**Description:** The system shall export all traced items as a ReqIF 1.1 document with one object type per artifact type, the item text as an XHTML attribute, and covers links as spec relations, such that re-importing the export yields the same canonical IDs and links.
+**Description:** The system shall export all traced items as a ReqIF 1.1 document with one object type per artifact type, the item text as an XHTML attribute, all named item attributes as string attribute values, covers links as typed spec relations, and a single specification with a flat hierarchy over all objects so importing tools present the export as an ordered module. Re-importing the export shall yield the same canonical IDs, links, and attributes.
 
 **Covers:** feat~reqif-interchange~1
 
-**Rationale:** A lossless round-trip lets teams answer customer tools with live traceability data instead of stale spreadsheets.
+**Rationale:** A lossless round-trip lets teams answer customer tools with live traceability data instead of stale spreadsheets. The specification hierarchy makes the exchange module-oriented, as DOORS and Polarion expect.
 
 **Tags:** interoperability, reqif, export
 

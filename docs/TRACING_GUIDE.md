@@ -303,11 +303,16 @@ cargo ovft reqif import customer.reqif --out docs/requirements/customer.md
 # Map the customer's type names onto your artifact types
 cargo ovft reqif import customer.reqif --map "Customer Requirement=creq,Requirement=req"
 
-# Export your items + trace links back to ReqIF (a ReqIF 1.1 document)
+# Map relation types to link direction (default: source covers target)
+cargo ovft reqif import customer.reqif --map-relation "satisfies=covers,satisfied-by=covered-by,depends-on=ignore"
+
+# Export your items + trace links back to ReqIF (a ReqIF 1.1 document
+# with a module structure, i.e. one specification containing all objects
+# in report order, ready for DOORS/Polarion import)
 cargo ovft reqif export --out trace.reqif
 ```
 
-Canonical IDs of imported items derive from the stable ReqIF identifier (kept as an alias), so re-importing after the customer renames a heading does not break existing coverage tags. Imported files are marked as generated — treat the ReqIF side as the source of truth for those items and re-import on change. Export is lossless for OVFT itself: re-importing an export yields the same canonical IDs.
+Canonical IDs of imported items derive from the stable ReqIF identifier (kept as an alias), so re-importing after the customer renames a heading does not break existing coverage tags. Attributes beyond the requirement text (Status, Priority, enumerations, …) are preserved as named item attributes and round-trip through both markdown and ReqIF export. Imported files are marked as generated — treat the ReqIF side as the source of truth for those items and re-import on change. Export is lossless for OVFT itself: re-importing an export yields the same canonical IDs, links, and attributes.
 
 ---
 

@@ -397,7 +397,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
         // eslint-disable-next-line @typescript-eslint/no-var-requires
         const wasm = require("../pkg/ovft_wasm");
-        const markdown: string = wasm.import_reqif_to_markdown(content, "[]");
+        const markdown: string = wasm.import_reqif_to_markdown(content, "[]", "[]");
 
         const defaultUri = vscode.Uri.file(inputUri.fsPath.replace(/\.[^.\\/]+$/, "") + ".md");
         const target = await vscode.window.showSaveDialog({

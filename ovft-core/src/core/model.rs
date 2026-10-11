@@ -136,6 +136,10 @@ pub struct SpecificationItem {
     /// Short external aliases for this item (e.g. "ABC-1234"), usable as tag targets
     #[serde(default)]
     pub aliases: Vec<String>,
+    /// Additional named attributes (e.g. ReqIF attributes like Status or
+    /// Priority preserved on import), as name/value pairs in document order
+    #[serde(default)]
+    pub attributes: Vec<(String, String)>,
     /// Source location where this item is defined
     pub location: Option<Location>,
 }
@@ -155,6 +159,7 @@ impl SpecificationItem {
             covers: Vec::new(),
             depends: Vec::new(),
             aliases: Vec::new(),
+            attributes: Vec::new(),
             location: None,
         }
     }
@@ -256,6 +261,16 @@ impl SpecificationItemBuilder {
 
     pub fn aliases(mut self, aliases: Vec<String>) -> Self {
         self.item.aliases.extend(aliases);
+        self
+    }
+
+    pub fn attribute(mut self, name: String, value: String) -> Self {
+        self.item.attributes.push((name, value));
+        self
+    }
+
+    pub fn attributes(mut self, attributes: Vec<(String, String)>) -> Self {
+        self.item.attributes.extend(attributes);
         self
     }
 
