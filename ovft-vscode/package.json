@@ -2,7 +2,7 @@
   "name": "ovft-tracing",
   "displayName": "OVFT Requirement Tracing",
   "description": "Navigate between requirement specifications and their coverage tags in source code (Open Very Fast Trace)",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "publisher": "ovft",
   "license": "MIT",
   "repository": {
@@ -216,7 +216,7 @@
   "devDependencies": {
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.85.0",
-    "@vscode/vsce": "^3.7.1",
+    "@vscode/vsce": "^4.0.0",
     "typescript": "^5.3.0"
   }
 }

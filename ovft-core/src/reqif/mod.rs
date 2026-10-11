@@ -51,7 +51,12 @@ fn get_attr(e: &BytesStart, name: &str) -> Option<String> {
     e.attributes()
         .flatten()
         .find(|a| local_name(a.key.as_ref()) == name)
-        .and_then(|a| a.unescape_value().ok().map(|v| v.into_owned()))
+        .and_then(|a| {
+            let raw = std::str::from_utf8(a.value.as_ref()).ok()?;
+            quick_xml::escape::unescape(raw)
+                .ok()
+                .map(|v| v.into_owned())
+        })
 }
 
 /// Lowercase, non-alphanumeric runs replaced by a single dash, dashes trimmed.
@@ -79,7 +84,7 @@ const LINE_BREAK: char = '\u{1}';
 
 /// Strip XHTML markup to plain text: block-level tags become newlines and
 /// whitespace runs collapse to single spaces. The input must already be
-/// entity-decoded (quick_xml unescapes text events before they reach us);
+/// entity-decoded (the parse loop resolves text and entity-reference events);
 /// decoding again here would corrupt literal text like `&lt;`.
 fn xhtml_to_text(xhtml: &str) -> String {
     // Replace block-level tags with break markers, drop all other tags.
@@ -547,9 +552,18 @@ pub fn import_reqif(
             }
             Ok(Event::Text(t)) => {
                 let text = t
-                    .unescape()
-                    .map_err(|e| Error::ReqIf(format!("XML entity decode error: {}", e)))?;
+                    .decode()
+                    .map_err(|e| Error::ReqIf(format!("XML text decode error: {}", e)))?;
                 state.handle_text(&text);
+            }
+            Ok(Event::GeneralRef(g)) => {
+                // quick-xml >= 0.38 reports entity references as separate events;
+                // resolve them (predefined and numeric) into their characters.
+                let raw = String::from_utf8_lossy(g.as_ref());
+                let entity = format!("&{};", raw);
+                let resolved = quick_xml::escape::unescape(&entity)
+                    .map_err(|e| Error::ReqIf(format!("XML entity decode error: {}", e)))?;
+                state.handle_text(&resolved);
             }
             Ok(Event::CData(t)) => {
                 state.handle_text(&String::from_utf8_lossy(t.as_ref()));
