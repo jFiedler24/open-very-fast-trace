@@ -1,0 +1,11 @@
+id = "ovft"
+name = "OpenFastTrace (OVFT)"
+description = "Requirements traceability: diagnostics, hover and go-to-definition for OVFT requirement IDs via the cargo-ovft language server."
+version = "0.1.0"
+schema_version = 1
+authors = ["jFiedler24"]
+repository = "https://github.com/jFiedler24/open-very-fast-trace"
+
+[language_servers.ovft]
+name = "OVFT Language Server"
+languages = ["Markdown", "Rust"]

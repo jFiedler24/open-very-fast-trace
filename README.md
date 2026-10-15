@@ -337,3 +337,14 @@ Licensed under either of:
 - 📦 **[Crates.io](https://crates.io/crates/cargo-ovft)** - Install with `cargo install cargo-ovft`
 - 📖 **[Documentation](https://docs.rs/cargo-ovft)** - API documentation and examples
 - 🐛 **[Issues](https://github.com/yourusername/open-very-fast-trace/issues)** - Bug reports and feature requests
+
+## Editor integration: Language Server (LSP)
+
+`cargo ovft ovft --lsp` starts a Language Server on stdio, usable from Zed, Neovim, Helix, Emacs, etc.
+
+- **Diagnostics**: uncovered items, orphaned / outdated / predated coverage links (refreshed on save)
+- **Hover**: title, coverage status and links for requirement IDs
+- **Go to definition**: tag → requirement, requirement → covering items
+- **Commands** (`workspace/executeCommand`): `ovft.refresh`, `ovft.generateReport` (→ `target/requirements_report.html`), `ovft.releaseNotes` (→ `target/release-notes.md`)
+
+A Zed extension lives in [`ovft-zed/`](ovft-zed/README.md).

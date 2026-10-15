@@ -22,3 +22,6 @@ toml = { workspace = true }
 env_logger = { workspace = true }
 anyhow = { workspace = true }
 zip = { workspace = true }
+lsp-server = "0.10"
+lsp-types = "0.97"
+log = { workspace = true }
