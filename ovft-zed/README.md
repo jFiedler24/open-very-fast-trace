@@ -21,3 +21,9 @@ Override the binary in Zed settings if needed:
 
 Not available in Zed (no extension API): HTML report panel, tree view, tag decorations.
 Use `cargo ovft ovft` for reports.
+
+## Testing
+
+- Protocol level (no editor needed): `cargo build -p cargo-ovft && python3 cargo-ovft/tests/lsp_smoke.py target/debug/cargo-ovft`
+- Extension build: `cd ovft-zed && cargo build --release --target wasm32-wasip2` (needs `rustup target add wasm32-wasip2`)
+- In Zed: `cargo install --path cargo-ovft`, run `zed: install dev extension` and pick `ovft-zed`, then open a project with an OVFT spec. Check `zed: open log` for "OVFT Language Server".
