@@ -1,0 +1,49 @@
+name: Publish VS Code Extension to Marketplace
+
+# Publishes the VSIX of an existing GitHub Release to the VS Code
+# Marketplace. Requires the VSCE_PAT repository secret (a Personal Access
+# Token with Marketplace > Acquire and Manage scope).
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag whose VSIX should be published (default: latest release)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish VSIX to Marketplace
+    runs-on: ubuntu-latest
+    env:
+      VSCE_PAT: ${{ secrets.VSCE_PAT }}
+
+    steps:
+      - name: Resolve release tag
+        id: tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_INPUT: ${{ inputs.tag }}
+        run: |
+          if [ -n "$TAG_INPUT" ]; then
+            echo "name=$TAG_INPUT" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=$(gh release view --json tagName --jq .tagName)" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download VSIX from the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release download "${{ steps.tag.outputs.name }}" --pattern '*.vsix'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Publish to Marketplace
+        run: npx --yes @vscode/vsce publish --packagePath "$(ls ./*.vsix)" -p "$VSCE_PAT"
