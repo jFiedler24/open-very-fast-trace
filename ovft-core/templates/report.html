@@ -49,9 +49,24 @@
                 {%- endfor -%}
             </div>
             {%- endif -%}
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <h3>Coverage status</h3>
+                    {{ donut_html|safe }}
+                </div>
+                <div class="chart-card chart-wide">
+                    <h3>Coverage by artifact type</h3>
+                    {{ coverage_bars_html|safe }}
+                </div>
+            </div>
             {%- if trace_result.defect_count > 0 -%}
             <div class="defect-statistics">
                 <h3>Defect Breakdown</h3>
+                {%- if !defect_bars_html.is_empty() -%}
+                <div class="chart-card chart-flush">
+                    {{ defect_bars_html|safe }}
+                </div>
+                {%- endif -%}
                 <ul class="defect-stats-list">
                     {%- for message in trace_result.defect_statistics_messages() -%}
                     <li class="defect-stat-item">{{ message }}</li>
@@ -62,21 +77,58 @@
         </section>
 
         {%- if trace_result.defect_count > 0 -%}
-        <section class="defects">
-            <h2>Defects Found</h2>
-            <div class="defect-list">
-                {%- for defect in trace_result.defects -%}
-                <div class="defect-item" data-defect-item-id="{%- match defect.item_id -%}{%- when Some with (id) -%}{{ id }}{%- when None -%}{%- endmatch -%}">
-                    <span class="defect-type">{{ defect.defect_type }}</span>
-                    <span class="defect-description">{{ defect.description }}</span>
-                    {%- match defect.item_id -%}
-                        {%- when Some with (id) -%}
-                            <a href="#{{ id.to_html_id() }}" class="defect-item-link" title="Go to {{ id }}">→ View Item</a>
-                        {%- when None -%}
-                    {%- endmatch -%}
+        <section class="defects collapsible-section">
+            <details>
+                <summary>
+                    <h2>Defects Found</h2>
+                    <span class="summary-badge defect-count">{{ trace_result.defect_count }}</span>
+                    <span class="summary-hint">click to expand</span>
+                </summary>
+                <div class="defect-list">
+                    {%- for defect in trace_result.defects -%}
+                    <div class="defect-item" data-defect-item-id="{%- match defect.item_id -%}{%- when Some with (id) -%}{{ id }}{%- when None -%}{%- endmatch -%}">
+                        <span class="defect-type">{{ defect.defect_type }}</span>
+                        <span class="defect-description">{{ defect.description }}</span>
+                        {%- match defect.item_id -%}
+                            {%- when Some with (id) -%}
+                                <a href="#{{ id.to_html_id() }}" class="defect-item-link" title="Go to {{ id }}">→ View Item</a>
+                            {%- when None -%}
+                        {%- endmatch -%}
+                    </div>
+                    {%- endfor -%}
                 </div>
-                {%- endfor -%}
-            </div>
+            </details>
+        </section>
+        {%- endif -%}
+
+        {%- if !type_flow_html.is_empty() || !trace_graph_html.is_empty() -%}
+        <section class="traceability collapsible-section">
+            <details>
+                <summary>
+                    <h2>Traceability Graph</h2>
+                    <span class="summary-hint">click to expand</span>
+                </summary>
+                <p class="section-description">Follow the links from requirements down to implementation and tests. Click a node to jump to its item card; hover to highlight its connections.</p>
+                {%- if !type_flow_html.is_empty() -%}
+                <h3 class="graph-title">Artifact type flow</h3>
+                <div class="graph-wrap">{{ type_flow_html|safe }}</div>
+                {%- endif -%}
+                {%- if !trace_graph_html.is_empty() -%}
+                <h3 class="graph-title">Item graph</h3>
+                {%- match trace_graph_note -%}
+                    {%- when Some with (note) -%}<p class="graph-note">{{ note }}</p>
+                    {%- when None -%}
+                {%- endmatch -%}
+                <div class="graph-wrap graph-wrap-tall">{{ trace_graph_html|safe }}</div>
+                {%- endif -%}
+                <details class="mermaid-block">
+                    <summary>Mermaid source — paste into GitHub/GitLab markdown</summary>
+                    <div class="mermaid-actions">
+                        <button type="button" class="copy-btn" data-copy-source="mermaid-source">Copy Mermaid</button>
+                    </div>
+                    <pre id="mermaid-source">{{ mermaid }}</pre>
+                </details>
+            </details>
         </section>
         {%- endif -%}
 
@@ -85,24 +137,46 @@
                 <h2>Specification Items</h2>
                 <div class="filter-bar">
                     <input type="search" id="filter-input" placeholder="Filter by title, ID or alias…" aria-label="Filter items">
-                    <div class="filter-buttons" role="group" aria-label="Filter by status">
+                    <select id="filter-type" aria-label="Filter by artifact type">
+                        <option value="all">All types</option>
+                        {%- for t in artifact_types -%}
+                        <option value="{{ t }}">{{ t }}</option>
+                        {%- endfor -%}
+                    </select>
+                    <select id="filter-istatus" aria-label="Filter by item status">
+                        <option value="all">All statuses</option>
+                        {%- for s in item_statuses -%}
+                        <option value="{{ s }}">{{ s }}</option>
+                        {%- endfor -%}
+                    </select>
+                    <div class="filter-buttons" role="group" aria-label="Filter by coverage">
                         <button type="button" data-filter="all" class="active">All</button>
                         <button type="button" data-filter="defect">Defects</button>
                         <button type="button" data-filter="uncovered">Uncovered</button>
                         <button type="button" data-filter="partial">Partial</button>
                         <button type="button" data-filter="covered">Covered</button>
                     </div>
+                    <div class="view-toggle" role="group" aria-label="Switch view">
+                        <button type="button" data-view="cards" class="active" title="Card view">▦ Cards</button>
+                        <button type="button" data-view="table" title="Table view">☰ Table</button>
+                    </div>
+                    <button type="button" id="collapse-all" class="ghost-btn" title="Collapse all item details">Collapse all</button>
+                    <button type="button" id="expand-all" class="ghost-btn" title="Expand all item details">Expand all</button>
                     <span class="filter-count" id="filter-count"></span>
                 </div>
             </div>
-            <div class="items-grid">
+
+            <div class="items-grid" id="items-grid">
                 {%- for item in trace_result.items -%}
                 <div class="spec-item status-{{ item.coverage_status }}{% if item.is_defect %} defect{% endif %}"
                      id="{{ item.item.id.to_html_id() }}"
                      data-req-id="{{ item.item.id }}"
                      data-status="{{ item.coverage_status }}"
-                     data-defect="{% if item.is_defect %}true{% else %}false{% endif %}">
+                     data-defect="{% if item.is_defect %}true{% else %}false{% endif %}"
+                     data-type="{{ item.item.id.artifact_type }}"
+                     data-istatus="{{ item.item.status }}">
                     <div class="item-header">
+                        <button type="button" class="item-toggle" aria-expanded="true" aria-label="Toggle item details" title="Collapse/expand">▾</button>
                         <h4 class="item-title">{{ item.title() }}</h4>
                         <span class="coverage-badge coverage-{{ item.coverage_status }}">{{ item.coverage_status }}</span>
                     </div>
@@ -113,90 +187,127 @@
                         {%- endfor -%}
                     </div>
 
-                    <div class="item-content">
-                        {%- match item.item.description -%}
-                            {%- when Some with (description) -%}
-                                <div class="item-description">{{ description|safe }}</div>
-                            {%- when None -%}
-                        {%- endmatch -%}
-                    </div>
+                    <div class="item-body">
+                        <div class="item-content">
+                            {%- match item.item.description -%}
+                                {%- when Some with (description) -%}
+                                    <div class="item-description">{{ description|safe }}</div>
+                                {%- when None -%}
+                            {%- endmatch -%}
+                        </div>
 
-                    <div class="item-metadata">
-                        {%- match item.item.location -%}
-                            {%- when Some with (location) -%}
-                                <div class="metadata-row">
-                                    <span class="metadata-label">Location:</span>
-                                    <span class="metadata-value">{{ location }}</span>
-                                </div>
-                            {%- when None -%}
-                        {%- endmatch -%}
-                        {%- if !item.item.needs.is_empty() -%}
-                        <div class="metadata-row">
-                            <span class="metadata-label">Needs:</span>
-                            <span class="metadata-value">
-                                {%- for need_type in item.item.needs -%}
-                                    {%- if item.is_need_covered(need_type) -%}
-                                        <span class="needs-covered" data-item-id="{{ item.item.id }}" data-need-type="{{ need_type }}">{{ need_type }}</span>
-                                    {%- else -%}
-                                        <span class="needs-uncovered" title="⚠ No {{ need_type }} coverage for {{ item.item.id }}">{{ need_type }} ⚠</span>
-                                    {%- endif -%}
-                                    {%- if !loop.last -%}, {%- endif -%}
-                                {%- endfor -%}
-                            </span>
+                        <div class="item-metadata">
+                            {%- match item.item.location -%}
+                                {%- when Some with (location) -%}
+                                    <div class="metadata-row">
+                                        <span class="metadata-label">Location:</span>
+                                        <span class="metadata-value">{{ location }}</span>
+                                    </div>
+                                {%- when None -%}
+                            {%- endmatch -%}
+                            {%- if !item.item.needs.is_empty() -%}
+                            <div class="metadata-row">
+                                <span class="metadata-label">Needs:</span>
+                                <span class="metadata-value">
+                                    {%- for need_type in item.item.needs -%}
+                                        {%- if item.is_need_covered(need_type) -%}
+                                            <span class="needs-covered" data-item-id="{{ item.item.id }}" data-need-type="{{ need_type }}">{{ need_type }}</span>
+                                        {%- else -%}
+                                            <span class="needs-uncovered" title="⚠ No {{ need_type }} coverage for {{ item.item.id }}">{{ need_type }} ⚠</span>
+                                        {%- endif -%}
+                                        {%- if !loop.last -%}, {%- endif -%}
+                                    {%- endfor -%}
+                                </span>
+                            </div>
+                            {%- endif -%}
+                            {%- if !item.item.covers.is_empty() -%}
+                            <div class="metadata-row">
+                                <span class="metadata-label">Covers:</span>
+                                <span class="metadata-value">
+                                    {%- for cover_id in item.item.covers -%}
+                                        <span class="requirement-link">{{ cover_id }}</span>
+                                        {%- if !loop.last -%}, {%- endif -%}
+                                    {%- endfor -%}
+                                </span>
+                            </div>
+                            {%- endif -%}
+                            {%- if !item.item.depends.is_empty() -%}
+                            <div class="metadata-row">
+                                <span class="metadata-label">Depends:</span>
+                                <span class="metadata-value">
+                                    {%- for depend_id in item.item.depends -%}
+                                        <span class="requirement-link">{{ depend_id }}</span>
+                                        {%- if !loop.last -%}, {%- endif -%}
+                                    {%- endfor -%}
+                                </span>
+                            </div>
+                            {%- endif -%}
+                            {%- if !item.outgoing_links.is_empty() -%}
+                            <div class="metadata-row">
+                                <span class="metadata-label">Outgoing Links:</span>
+                                <span class="metadata-value">
+                                    {%- for link in item.outgoing_links -%}
+                                        <span class="requirement-link link-{{ link.status }}">{{ link.target_id }}</span>
+                                        {%- if !loop.last -%}, {%- endif -%}
+                                    {%- endfor -%}
+                                </span>
+                            </div>
+                            {%- endif -%}
+                            {%- if !item.incoming_links.is_empty() -%}
+                            <div class="metadata-row">
+                                <span class="metadata-label">Incoming Links:</span>
+                                <span class="metadata-value">
+                                    {%- for link in item.incoming_links -%}
+                                        {%- match link.source_id -%}
+                                            {%- when Some with (source_id) -%}
+                                                <span class="requirement-link link-{{ link.status }}">{{ source_id }}</span>
+                                            {%- when None -%}
+                                                <span class="requirement-link link-{{ link.status }}">Unknown</span>
+                                        {%- endmatch -%}
+                                        {%- if !loop.last -%}, {%- endif -%}
+                                    {%- endfor -%}
+                                </span>
+                            </div>
+                            {%- endif -%}
+                            <div class="metadata-row">
+                                <span class="metadata-label">Status:</span>
+                                <span class="metadata-value">{{ item.item.status }}</span>
+                            </div>
                         </div>
-                        {%- endif -%}
-                        {%- if !item.item.covers.is_empty() -%}
-                        <div class="metadata-row">
-                            <span class="metadata-label">Covers:</span>
-                            <span class="metadata-value">
-                                {%- for cover_id in item.item.covers -%}
-                                    <span class="requirement-link">{{ cover_id }}</span>
-                                    {%- if !loop.last -%}, {%- endif -%}
-                                {%- endfor -%}
-                            </span>
-                        </div>
-                        {%- endif -%}
-                        {%- if !item.item.depends.is_empty() -%}
-                        <div class="metadata-row">
-                            <span class="metadata-label">Depends:</span>
-                            <span class="metadata-value">
-                                {%- for depend_id in item.item.depends -%}
-                                    <span class="requirement-link">{{ depend_id }}</span>
-                                    {%- if !loop.last -%}, {%- endif -%}
-                                {%- endfor -%}
-                            </span>
-                        </div>
-                        {%- endif -%}
-                        {%- if !item.outgoing_links.is_empty() -%}
-                        <div class="metadata-row">
-                            <span class="metadata-label">Outgoing Links:</span>
-                            <span class="metadata-value">
-                                {%- for link in item.outgoing_links -%}
-                                    <span class="requirement-link link-{{ link.status }}">{{ link.target_id }}</span>
-                                    {%- if !loop.last -%}, {%- endif -%}
-                                {%- endfor -%}
-                            </span>
-                        </div>
-                        {%- endif -%}
-                        {%- if !item.incoming_links.is_empty() -%}
-                        <div class="metadata-row">
-                            <span class="metadata-label">Incoming Links:</span>
-                            <span class="metadata-value">
-                                {%- for link in item.incoming_links -%}
-                                    {%- match link.source_id -%}
-                                        {%- when Some with (source_id) -%}
-                                            <span class="requirement-link link-{{ link.status }}">{{ source_id }}</span>
-                                        {%- when None -%}
-                                            <span class="requirement-link link-{{ link.status }}">Unknown</span>
-                                    {%- endmatch -%}
-                                    {%- if !loop.last -%}, {%- endif -%}
-                                {%- endfor -%}
-                            </span>
-                        </div>
-                        {%- endif -%}
                     </div>
                 </div>
                 {%- endfor -%}
+            </div>
+
+            <div class="items-table-wrap" id="items-table-wrap" hidden>
+                <table class="items-table" id="items-table">
+                    <thead>
+                        <tr>
+                            <th data-sort="id" class="sortable">ID</th>
+                            <th data-sort="title" class="sortable">Title</th>
+                            <th data-sort="type" class="sortable">Type</th>
+                            <th data-sort="cov" class="sortable">Coverage</th>
+                            <th data-sort="istatus" class="sortable">Status</th>
+                            <th data-sort="defect" class="sortable">Defect</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {%- for item in trace_result.items -%}
+                        <tr data-req-id="{{ item.item.id }}"
+                            data-status="{{ item.coverage_status }}"
+                            data-defect="{% if item.is_defect %}true{% else %}false{% endif %}"
+                            data-type="{{ item.item.id.artifact_type }}"
+                            data-istatus="{{ item.item.status }}">
+                            <td data-val="{{ item.item.id }}"><a href="#{{ item.item.id.to_html_id() }}"><code>{{ item.item.id }}</code></a></td>
+                            <td>{{ item.title() }}</td>
+                            <td data-val="{{ item.item.id.artifact_type }}">{{ item.item.id.artifact_type }}</td>
+                            <td data-val="{{ item.coverage_status }}"><span class="coverage-badge coverage-{{ item.coverage_status }}">{{ item.coverage_status }}</span></td>
+                            <td data-val="{{ item.item.status }}">{{ item.item.status }}</td>
+                            <td data-val="{% if item.is_defect %}1{% else %}0{% endif %}">{% if item.is_defect %}<span class="defect-mark" title="Has defects">⚠</span>{% endif %}</td>
+                        </tr>
+                        {%- endfor -%}
+                    </tbody>
+                </table>
             </div>
         </section>
     </div>
@@ -204,27 +315,22 @@
     <script>
         // [impl->req~html-compliant-anchors~1]
         // [impl->req~defect-requirement-linking~1]
-        // Make requirement IDs clickable by adding hyperlinks
         document.addEventListener('DOMContentLoaded', function() {
-            // Create a map of requirement ID to HTML-safe anchor ID
-            const requirementElements = document.querySelectorAll('.spec-item');
+            const requirementElements = Array.from(document.querySelectorAll('.spec-item'));
+            const tableRows = Array.from(document.querySelectorAll('#items-table tbody tr'));
             const idToAnchor = new Map();
 
             requirementElements.forEach((element) => {
                 const reqId = element.getAttribute('data-req-id');
                 if (reqId) {
-                    // HTML-safe ID is already set on the element
-                    const anchorId = element.id;
-                    idToAnchor.set(reqId, anchorId);
+                    idToAnchor.set(reqId, element.id);
                 }
             });
 
             // Convert requirement text to links in metadata sections
-            const requirementLinks = document.querySelectorAll('.requirement-link');
-            requirementLinks.forEach(linkElement => {
+            document.querySelectorAll('.requirement-link').forEach(linkElement => {
                 const reqId = linkElement.textContent.trim();
                 if (idToAnchor.has(reqId)) {
-                    // Convert span to anchor
                     const anchor = document.createElement('a');
                     anchor.href = '#' + idToAnchor.get(reqId);
                     anchor.className = linkElement.className;
@@ -234,10 +340,8 @@
             });
 
             // Convert requirement IDs in defect descriptions to clickable links
-            const defectDescriptions = document.querySelectorAll('.defect-description');
-            defectDescriptions.forEach(descElement => {
+            document.querySelectorAll('.defect-description').forEach(descElement => {
                 let html = descElement.innerHTML;
-                // Match requirement ID patterns like "req~name~1" or "dsn~name~2"
                 const reqIdPattern = /\b([a-z]+)~([a-zA-Z0-9-_]+)~(\d+)\b/g;
                 html = html.replace(reqIdPattern, (match) => {
                     if (idToAnchor.has(match)) {
@@ -249,29 +353,17 @@
             });
 
             // Convert covered needs types into hyperlinks to covering items
-            const needsCoveredSpans = document.querySelectorAll('.needs-covered');
-            needsCoveredSpans.forEach(span => {
+            document.querySelectorAll('.needs-covered').forEach(span => {
                 const itemId = span.getAttribute('data-item-id');
                 const needType = span.getAttribute('data-need-type');
-                const itemElement = document.querySelector(`.spec-item[data-req-id="${itemId}"]`);
-                if (!itemElement) return;
-
-                // Find the incoming links row for this item
-                const incomingRow = itemElement.querySelector('.metadata-row .metadata-label');
-                if (!incomingRow) return;
-
-                // Build list of covering item IDs by matching artifact type against need type
                 const coveringIds = [];
-                // Also search all spec items for items whose artifact type matches
                 requirementElements.forEach(el => {
                     const rid = el.getAttribute('data-req-id');
                     if (!rid) return;
-                    // Check if this item's artifact type matches the need type
                     const parts = rid.split('~');
                     if (parts[0] === needType) {
-                        // Check if this item covers our item (has outgoing link to it)
-                        const outgoingLinks = el.querySelectorAll('.metadata-row');
-                        outgoingLinks.forEach(row => {
+                        const outgoingRows = el.querySelectorAll('.metadata-row');
+                        outgoingRows.forEach(row => {
                             const label = row.querySelector('.metadata-label');
                             if (label && label.textContent.trim() === 'Outgoing Links:') {
                                 const links = row.querySelectorAll('.requirement-link');
@@ -285,54 +377,57 @@
                     }
                 });
 
-                if (coveringIds.length === 1) {
-                    // Single covering item — make a direct link
+                if (coveringIds.length >= 1) {
                     const anchor = document.createElement('a');
                     anchor.href = '#' + coveringIds[0].anchor;
                     anchor.className = span.className;
                     anchor.textContent = span.textContent;
-                    anchor.title = 'Go to ' + coveringIds[0].id;
-                    span.parentNode.replaceChild(anchor, span);
-                } else if (coveringIds.length > 1) {
-                    // Multiple covering items — link to the first, show count in title
-                    const anchor = document.createElement('a');
-                    anchor.href = '#' + coveringIds[0].anchor;
-                    anchor.className = span.className;
-                    anchor.textContent = span.textContent;
-                    anchor.title = 'Covered by: ' + coveringIds.map(c => c.id).join(', ');
+                    anchor.title = coveringIds.length > 1
+                        ? 'Covered by: ' + coveringIds.map(c => c.id).join(', ')
+                        : 'Go to ' + coveringIds[0].id;
                     span.parentNode.replaceChild(anchor, span);
                 }
             });
 
-            // Filter bar: text filter + status filter over spec items
+            // ---- Filtering (cards + table rows) ----
             const filterInput = document.getElementById('filter-input');
             const filterButtons = document.querySelectorAll('.filter-buttons button');
+            const filterType = document.getElementById('filter-type');
+            const filterIstatus = document.getElementById('filter-istatus');
             const filterCount = document.getElementById('filter-count');
             let activeStatusFilter = 'all';
+
+            function matchesFilters(el, query) {
+                if (query && !el.textContent.toLowerCase().includes(query)) return false;
+                if (activeStatusFilter === 'defect') {
+                    if (el.getAttribute('data-defect') !== 'true') return false;
+                } else if (activeStatusFilter !== 'all') {
+                    if (el.getAttribute('data-status') !== activeStatusFilter) return false;
+                }
+                if (filterType && filterType.value !== 'all' && el.getAttribute('data-type') !== filterType.value) return false;
+                if (filterIstatus && filterIstatus.value !== 'all' && el.getAttribute('data-istatus') !== filterIstatus.value) return false;
+                return true;
+            }
 
             function applyFilter() {
                 const query = (filterInput ? filterInput.value : '').trim().toLowerCase();
                 let visible = 0;
                 requirementElements.forEach(el => {
-                    const matchesText = !query || el.textContent.toLowerCase().includes(query);
-                    let matchesStatus = true;
-                    if (activeStatusFilter === 'defect') {
-                        matchesStatus = el.getAttribute('data-defect') === 'true';
-                    } else if (activeStatusFilter !== 'all') {
-                        matchesStatus = el.getAttribute('data-status') === activeStatusFilter;
-                    }
-                    const show = matchesText && matchesStatus;
+                    const show = matchesFilters(el, query);
                     el.style.display = show ? '' : 'none';
                     if (show) visible++;
+                });
+                tableRows.forEach(el => {
+                    el.style.display = matchesFilters(el, query) ? '' : 'none';
                 });
                 if (filterCount) {
                     filterCount.textContent = visible + ' of ' + requirementElements.length + ' items';
                 }
             }
 
-            if (filterInput) {
-                filterInput.addEventListener('input', applyFilter);
-            }
+            if (filterInput) filterInput.addEventListener('input', applyFilter);
+            if (filterType) filterType.addEventListener('change', applyFilter);
+            if (filterIstatus) filterIstatus.addEventListener('change', applyFilter);
             filterButtons.forEach(button => {
                 button.addEventListener('click', () => {
                     activeStatusFilter = button.getAttribute('data-filter');
@@ -340,6 +435,124 @@
                     applyFilter();
                 });
             });
+
+            // ---- View toggle: cards <-> table ----
+            const viewButtons = document.querySelectorAll('.view-toggle button');
+            const cardsView = document.getElementById('items-grid');
+            const tableView = document.getElementById('items-table-wrap');
+            viewButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const view = button.getAttribute('data-view');
+                    viewButtons.forEach(b => b.classList.toggle('active', b === button));
+                    if (cardsView) cardsView.hidden = view !== 'cards';
+                    if (tableView) tableView.hidden = view !== 'table';
+                });
+            });
+
+            // ---- Collapsible item details ----
+            function setCollapsed(card, collapsed) {
+                const body = card.querySelector('.item-body');
+                const toggle = card.querySelector('.item-toggle');
+                if (!body || !toggle) return;
+                body.classList.toggle('collapsed', collapsed);
+                toggle.textContent = collapsed ? '▸' : '▾';
+                toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+            }
+
+            requirementElements.forEach(card => {
+                const toggle = card.querySelector('.item-toggle');
+                if (toggle) {
+                    toggle.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const body = card.querySelector('.item-body');
+                        setCollapsed(card, body && !body.classList.contains('collapsed'));
+                    });
+                }
+            });
+
+            const collapseAll = document.getElementById('collapse-all');
+            const expandAll = document.getElementById('expand-all');
+            if (collapseAll) collapseAll.addEventListener('click', () => requirementElements.forEach(c => setCollapsed(c, true)));
+            if (expandAll) expandAll.addEventListener('click', () => requirementElements.forEach(c => setCollapsed(c, false)));
+
+            // ---- Sortable table ----
+            const table = document.getElementById('items-table');
+            if (table) {
+                const headers = table.querySelectorAll('th.sortable');
+                let sortKey = null;
+                let sortAsc = true;
+
+                headers.forEach(th => {
+                    th.addEventListener('click', () => {
+                        const key = th.getAttribute('data-sort');
+                        sortAsc = (sortKey === key) ? !sortAsc : true;
+                        sortKey = key;
+                        headers.forEach(h => h.classList.remove('sort-asc', 'sort-desc'));
+                        th.classList.add(sortAsc ? 'sort-asc' : 'sort-desc');
+
+                        const colIndex = Array.from(th.parentNode.children).indexOf(th);
+                        const tbody = table.querySelector('tbody');
+                        const rows = Array.from(tbody.querySelectorAll('tr'));
+                        rows.sort((a, b) => {
+                            const ac = a.children[colIndex];
+                            const bc = b.children[colIndex];
+                            const av = (ac.getAttribute('data-val') || ac.textContent).trim();
+                            const bv = (bc.getAttribute('data-val') || bc.textContent).trim();
+                            const cmp = av.localeCompare(bv, undefined, { numeric: true, sensitivity: 'base' });
+                            return sortAsc ? cmp : -cmp;
+                        });
+                        rows.forEach(r => tbody.appendChild(r));
+                    });
+                });
+            }
+
+            // ---- Copy buttons (Mermaid source) ----
+            document.querySelectorAll('.copy-btn').forEach(button => {
+                button.addEventListener('click', () => {
+                    const target = document.getElementById(button.getAttribute('data-copy-source'));
+                    if (!target) return;
+                    const text = target.textContent;
+                    const done = () => {
+                        const original = button.textContent;
+                        button.textContent = 'Copied!';
+                        setTimeout(() => { button.textContent = original; }, 1500);
+                    };
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+                    } else {
+                        fallbackCopy(text, done);
+                    }
+                });
+            });
+
+            function fallbackCopy(text, done) {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.style.position = 'fixed';
+                ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.select();
+                try { document.execCommand('copy'); done(); } catch (e) { /* ignore */ }
+                document.body.removeChild(ta);
+            }
+
+            // ---- Graph hover: highlight connected edges ----
+            document.querySelectorAll('.trace-graph .gnode').forEach(node => {
+                const n = node.getAttribute('data-n');
+                node.addEventListener('mouseenter', () => {
+                    document.querySelectorAll('.trace-graph .gedge').forEach(edge => {
+                        const connected = edge.getAttribute('data-s') === n || edge.getAttribute('data-t') === n;
+                        edge.classList.toggle('dim', !connected);
+                        edge.classList.toggle('lit', connected);
+                    });
+                });
+                node.addEventListener('mouseleave', () => {
+                    document.querySelectorAll('.trace-graph .gedge').forEach(edge => {
+                        edge.classList.remove('dim', 'lit');
+                    });
+                });
+            });
+
             applyFilter();
 
             // Add smooth scrolling
@@ -352,7 +565,6 @@
                             behavior: 'smooth',
                             block: 'center'
                         });
-                        // Highlight the target briefly
                         target.style.backgroundColor = '#fff3cd';
                         setTimeout(() => {
                             target.style.backgroundColor = '';

@@ -28,8 +28,7 @@ fn main() -> Result<()> {
                         .short('o')
                         .long("output")
                         .value_name("FILE")
-                        .help("Output HTML report file")
-                        .default_value("requirements_report.html"),
+                        .help("Output report file ('-' or omit for stdout with --format text)"),
                 )
                 .arg(
                     Arg::new("format")
@@ -37,15 +36,34 @@ fn main() -> Result<()> {
                         .long("format")
                         .value_name("FORMAT")
                         .help("Output format")
-                        .value_parser(["html", "json"])
+                        .value_parser(["html", "json", "text"])
                         .default_value("html"),
                 )
                 .arg(
                     Arg::new("verbose")
                         .short('v')
                         .long("verbose")
-                        .help("Enable verbose output")
-                        .action(clap::ArgAction::SetTrue),
+                        .help("Increase report verbosity: -v summary, -vv failures, -vvv all items (text format); verbose log output otherwise")
+                        .action(clap::ArgAction::Count),
+                )
+                .arg(
+                    Arg::new("wanted-types")
+                        .long("wanted-types")
+                        .value_name("TYPES")
+                        .help("Comma-separated artifact types to include in the report (e.g. \"req,dsn\")"),
+                )
+                .arg(
+                    Arg::new("status")
+                        .long("status")
+                        .value_name("STATUS")
+                        .help("Only include items with this status (draft, proposed, approved, rejected)"),
+                )
+                .arg(
+                    Arg::new("mermaid")
+                        .long("mermaid")
+                        .value_name("FILE")
+                        .num_args(0..=1)
+                        .help("Additionally emit a Mermaid traceability flowchart (to FILE, or stdout if no file is given)"),
                 )
                 .arg(
                     Arg::new("config")
@@ -162,17 +180,51 @@ fn run_ovft(matches: &ArgMatches) -> Result<()> {
     }
 
     let input_dir = matches.get_one::<String>("input").unwrap();
-    let output_file = matches.get_one::<String>("output").unwrap();
     let format = matches.get_one::<String>("format").unwrap();
-    let verbose = matches.get_flag("verbose");
+    let verbose_count = matches.get_count("verbose");
+    let verbose = verbose_count > 0;
     let check_mode = matches.get_flag("check");
     let config_file = matches.get_one::<String>("config");
+    let mermaid = matches
+        .get_many::<String>("mermaid")
+        .map(|mut v| v.next().cloned());
+
+    let output_file = matches
+        .get_one::<String>("output")
+        .cloned()
+        .unwrap_or_else(|| {
+            if format == "text" {
+                "-".to_string()
+            } else {
+                "requirements_report.html".to_string()
+            }
+        });
+    let to_stdout = output_file == "-";
+
+    // Report filters (display level): artifact types and item status.
+    let filter = {
+        let wanted_types = matches.get_one::<String>("wanted-types").map(|s| {
+            s.split(',')
+                .map(|t| t.trim().to_string())
+                .filter(|t| !t.is_empty())
+                .collect::<Vec<_>>()
+        });
+        let item_status = matches
+            .get_one::<String>("status")
+            .map(|s| s.parse::<ovft_core::ItemStatus>())
+            .transpose()
+            .context("Invalid --status value (expected draft, proposed, approved or rejected)")?;
+        ovft_core::reporters::ReportFilter {
+            wanted_types,
+            item_status,
+        }
+    };
 
     if verbose {
-        println!("🔍 Running OVFT requirements traceability analysis");
-        println!("📁 Input directory: {}", input_dir);
-        println!("📄 Output file: {}", output_file);
-        println!("📋 Format: {}", format);
+        eprintln!("🔍 Running OVFT requirements traceability analysis");
+        eprintln!("📁 Input directory: {}", input_dir);
+        eprintln!("📄 Output file: {}", output_file);
+        eprintln!("📋 Format: {}", format);
     }
 
     // Find Cargo.toml to determine project root
@@ -181,25 +233,25 @@ fn run_ovft(matches: &ArgMatches) -> Result<()> {
         find_cargo_project_root(&current_dir).context("Not in a Cargo project directory")?;
 
     if verbose {
-        println!("🏠 Project root: {}", project_root.display());
+        eprintln!("🏠 Project root: {}", project_root.display());
     }
 
     // Load configuration - either from specified file, auto-discover .ovft.toml, or use defaults
     let mut config = if let Some(config_path) = config_file {
         if verbose {
-            println!("📋 Loading configuration from: {}", config_path);
+            eprintln!("📋 Loading configuration from: {}", config_path);
         }
         Config::from_file(config_path)
             .with_context(|| format!("Failed to load configuration from {}", config_path))?
     } else {
         if verbose {
-            println!("📋 Looking for .ovft.toml configuration file...");
+            eprintln!("📋 Looking for .ovft.toml configuration file...");
         }
         let loaded_config = Config::load_or_default();
         if Config::find_and_load_config(&current_dir).is_some() && verbose {
-            println!("✅ Found and loaded .ovft.toml configuration");
+            eprintln!("✅ Found and loaded .ovft.toml configuration");
         } else if verbose {
-            println!("ℹ️  No .ovft.toml found, using default configuration");
+            eprintln!("ℹ️  No .ovft.toml found, using default configuration");
         }
         loaded_config
     };
@@ -208,11 +260,13 @@ fn run_ovft(matches: &ArgMatches) -> Result<()> {
     if input_dir != "." {
         config.spec_dirs = vec![PathBuf::from(input_dir)];
     }
-    
-    if let Some(output_parent) = PathBuf::from(output_file).parent() {
-        config.output_dir = Some(output_parent.to_path_buf());
+
+    if !to_stdout {
+        if let Some(output_parent) = PathBuf::from(&output_file).parent() {
+            config.output_dir = Some(output_parent.to_path_buf());
+        }
     }
-    
+
     config.verbose = verbose;
 
     // Run the tracer
@@ -222,20 +276,20 @@ fn run_ovft(matches: &ArgMatches) -> Result<()> {
         .context("Failed to run requirements traceability analysis")?;
 
     if verbose {
-        println!("✅ Analysis complete!");
-        println!("📊 Requirements found: {}", trace_result.items.len());
-        println!("🔗 Total items: {}", trace_result.total_items);
+        eprintln!("✅ Analysis complete!");
+        eprintln!("📊 Requirements found: {}", trace_result.items.len());
+        eprintln!("🔗 Total items: {}", trace_result.total_items);
 
         if trace_result.defect_count > 0 {
-            println!("❌ Defects found: {}", trace_result.defect_count);
+            eprintln!("❌ Defects found: {}", trace_result.defect_count);
             for defect in &trace_result.defects {
-                println!("   - {:?}: {}", defect.defect_type, defect.description);
+                eprintln!("   - {:?}: {}", defect.defect_type, defect.description);
             }
         }
 
         // Print coverage summary
         for (artifact_type, summary) in &trace_result.coverage_summary {
-            println!(
+            eprintln!(
                 "📊 {}: {}/{} ({:.1}% coverage)",
                 artifact_type, summary.covered, summary.total, summary.percentage
             );
@@ -244,11 +298,23 @@ fn run_ovft(matches: &ArgMatches) -> Result<()> {
 
     // Generate report
     if format == "html" {
-        let output_path = PathBuf::from(output_file);
+        let output_path = PathBuf::from(&output_file);
         tracer
             .generate_html_report(&trace_result, &output_path)
             .context("Failed to generate HTML report")?;
         println!("📄 HTML report generated: {}", output_file);
+    } else if format == "text" {
+        let report = ovft_core::reporters::PlainTextReporter::new(
+            ovft_core::reporters::Verbosity::from_count(verbose_count),
+            filter.clone(),
+        )
+        .render(&trace_result);
+        if to_stdout {
+            print!("{}", report);
+        } else {
+            std::fs::write(&output_file, &report).context("Failed to write text report")?;
+            println!("📄 Text report generated: {}", output_file);
+        }
     } else {
         // For JSON format, output the trace result data
         let json_data = serde_json::json!({
@@ -262,8 +328,22 @@ fn run_ovft(matches: &ArgMatches) -> Result<()> {
 
         let json = serde_json::to_string_pretty(&json_data)
             .context("Failed to serialize result to JSON")?;
-        std::fs::write(output_file, json).context("Failed to write JSON output")?;
+        std::fs::write(&output_file, json).context("Failed to write JSON output")?;
         println!("📄 JSON report generated: {}", output_file);
+    }
+
+    // Optional Mermaid flowchart of the traceability graph
+    if let Some(target) = mermaid {
+        let chart = ovft_core::reporters::visuals::mermaid_flowchart(&trace_result, 500);
+        match target {
+            Some(file) => {
+                std::fs::write(&file, &chart).context("Failed to write Mermaid flowchart")?;
+                println!("🧜 Mermaid flowchart written to: {}", file);
+            }
+            None => {
+                println!("{}", chart);
+            }
+        }
     }
 
     // Check mode: exit with error if issues found
@@ -452,15 +532,17 @@ fn read_reqif_xml(path: &Path) -> Result<String> {
     let bytes = std::fs::read(path)?;
     let is_zip = path
         .extension()
-        .is_some_and(|ext| {
-            ext.eq_ignore_ascii_case("reqifz") || ext.eq_ignore_ascii_case("rifz")
-        })
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("reqifz") || ext.eq_ignore_ascii_case("rifz"))
         || bytes.starts_with(b"PK\x03\x04");
     if !is_zip {
         return String::from_utf8(bytes).context("ReqIF file is not valid UTF-8");
     }
-    extract_reqif_from_zip(&bytes)
-        .with_context(|| format!("Failed to extract ReqIF document from archive {}", path.display()))
+    extract_reqif_from_zip(&bytes).with_context(|| {
+        format!(
+            "Failed to extract ReqIF document from archive {}",
+            path.display()
+        )
+    })
 }
 
 fn extract_reqif_from_zip(bytes: &[u8]) -> Result<String> {

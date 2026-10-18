@@ -30,9 +30,37 @@ impl HtmlReporter {
             .collect();
         coverage_strip.sort_by(|a, b| a.0.cmp(&b.0));
 
+        let artifact_types: Vec<String> = coverage_strip.iter().map(|(k, _)| k.clone()).collect();
+
+        let mut item_statuses: Vec<String> = processed_trace_result
+            .items
+            .iter()
+            .map(|i| i.item.status.to_string())
+            .collect();
+        item_statuses.sort();
+        item_statuses.dedup();
+
+        let (trace_graph, trace_note) = crate::reporters::visuals::trace_graph_svg(
+            &processed_trace_result,
+            MAX_GRAPH_NODES,
+        );
+        let coverage_bars_html = crate::reporters::visuals::coverage_bars(&coverage_strip);
+
         let template = HtmlReportTemplate {
             trace_result: &processed_trace_result,
             coverage_strip,
+            artifact_types,
+            item_statuses,
+            donut_html: crate::reporters::visuals::status_donut(&processed_trace_result),
+            coverage_bars_html,
+            defect_bars_html: crate::reporters::visuals::defect_bars(&processed_trace_result),
+            type_flow_html: crate::reporters::visuals::type_flow_svg(&processed_trace_result),
+            trace_graph_html: trace_graph,
+            trace_graph_note: trace_note,
+            mermaid: crate::reporters::visuals::mermaid_flowchart(
+                &processed_trace_result,
+                MAX_GRAPH_NODES * 2,
+            ),
             css: include_str!("../assets/report.css"),
         };
 
@@ -105,12 +133,24 @@ impl HtmlReporter {
     }
 }
 
+/// Maximum number of item-graph nodes rendered in the HTML report.
+const MAX_GRAPH_NODES: usize = 150;
+
 /// Template for generating HTML reports
 #[derive(Template)]
 #[template(path = "report.html")]
 struct HtmlReportTemplate<'a> {
     trace_result: &'a TraceResult,
     coverage_strip: Vec<(String, crate::core::CoverageSummary)>,
+    artifact_types: Vec<String>,
+    item_statuses: Vec<String>,
+    donut_html: String,
+    coverage_bars_html: String,
+    defect_bars_html: String,
+    type_flow_html: String,
+    trace_graph_html: String,
+    trace_graph_note: Option<String>,
+    mermaid: String,
     css: &'a str,
 }
 
@@ -153,6 +193,15 @@ mod tests {
         let template = HtmlReportTemplate {
             trace_result: &trace_result,
             coverage_strip: vec![],
+            artifact_types: vec![],
+            item_statuses: vec![],
+            donut_html: String::new(),
+            coverage_bars_html: String::new(),
+            defect_bars_html: String::new(),
+            type_flow_html: String::new(),
+            trace_graph_html: String::new(),
+            trace_graph_note: None,
+            mermaid: String::new(),
             css: "/* test css */",
         };
 

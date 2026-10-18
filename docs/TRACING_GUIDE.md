@@ -225,7 +225,8 @@ The artifact types included are configurable via `release_note_types` in `.ovft.
 
 ## Readability Features
 
-- The HTML report leads with each item's human-readable title, shows the full ID and aliases as badges, summarizes coverage per artifact type, and offers a text/status filter bar.
+- The HTML report leads with each item's human-readable title, shows the full ID and aliases as badges, summarizes coverage per artifact type, and offers a filter bar (text, artifact type, item status, coverage). Item details collapse/expand, a sortable table view lists every item, and inline SVG charts (coverage donut, per-type bars, defect breakdown) plus traceability graphs (artifact-type flow and an item-level graph whose nodes link back to the item cards) render offline with no JavaScript libraries. A Mermaid flowchart of the graph can be copied from the report or exported with `cargo ovft --mermaid [FILE]`.
+- Plain-text reports for terminals and CI logs come in four verbosity levels: `cargo ovft -f text` (one-line verdict), `-v` (coverage summary), `-vv` (plus defects), `-vvv` (plus every item and its links). Filter with `--wanted-types req,dsn` and `--status approved`.
 - The VS Code extension hides lines that contain only coverage tags, showing a small inline badge instead (the raw line reappears while the cursor is on it). Toggle with the `OVFT: Toggle Tag Visibility` command or the `ovft.hideTags` setting.
 
 ---

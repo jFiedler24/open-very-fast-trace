@@ -34,6 +34,15 @@ artifact_types = ["creq", "feat", "req", "arch", "dsn",
 
 Run `cargo ovft` (HTML report, default `requirements_report.html`), or
 `cargo ovft --check` which exits non-zero on defects — the CI gate.
+The HTML report contains inline-SVG coverage charts (donut, per-type bars,
+defect breakdown), traceability graphs (artifact-type flow + item-level graph
+with clickable nodes, no JS libraries), a Mermaid source block for GitHub
+markdown, a filter bar (text/type/item-status/coverage), collapsible item
+cards and a sortable table view.
+`cargo ovft -f text [-v|-vv|-vvv]` prints a plain-text report (verdict →
+coverage summary → defects → all items) for CI logs; `--wanted-types req,dsn`
+and `--status approved` filter it. `cargo ovft --mermaid [FILE]` exports a
+Mermaid flowchart of the trace graph.
 `cargo ovft release-notes [--from <git-ref>]` summarizes requirements that
 became covered since a tag (default: latest tag) as markdown release notes.
 `cargo ovft reqif import <file> [--map "Customer Requirement=creq"]` turns a

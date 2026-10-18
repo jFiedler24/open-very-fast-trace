@@ -135,17 +135,29 @@ cargo ovft --input docs/requirements --output trace_report.html
 
 # Check mode - fail if requirements not covered (great for CI!)
 cargo ovft --check
+
+# Plain-text report for CI logs: -v summary, -vv +defects, -vvv +all items
+cargo ovft --format text -vv
+
+# Filter the report by artifact type and/or item status
+cargo ovft --format text --wanted-types req,dsn --status approved
+
+# Export a Mermaid traceability flowchart for docs/README diagrams
+cargo ovft --mermaid traceability.mmd
 ```
 
 ### **4. Beautiful HTML Reports**
 
 Open `target/requirements_report.html` in your browser to see:
 
-- 📊 **Complete traceability matrix** with coverage status
+- 📊 **Coverage charts** - donut and per-artifact-type bars, plus a defect breakdown
+- 🕸️ **Traceability graphs** - artifact-type flow and an item-level graph with clickable nodes (offline, no JS libraries)
+- 🧜 **Mermaid export** - copy the flowchart source straight into GitHub/GitLab markdown
 - 🔗 **Clickable requirement links** - jump between related items
 - ⚠️ **Defect detection** - uncovered requirements highlighted
+- 🔍 **Filter bar** - by text, artifact type, item status and coverage
+- ☰ **Sortable table view** - every item, one click to sort; cards collapse/expand
 - 🎨 **Professional styling** - easy to read and navigate
-- 📈 **Coverage statistics** - see project health at a glance
 
 ## 🔧 **Build Integration**
 
