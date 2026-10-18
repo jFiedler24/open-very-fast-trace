@@ -4,6 +4,8 @@ use ovft_core::{Config, Tracer};
 use std::env;
 use std::path::{Path, PathBuf};
 
+mod lsp;
+
 fn main() -> Result<()> {
     env_logger::init();
 
@@ -71,6 +73,12 @@ fn main() -> Result<()> {
                         .value_name("FILE")
                         .help("Path to configuration file (.ovft.toml)")
                         .required(false),
+                )
+                .arg(
+                    Arg::new("lsp")
+                        .long("lsp")
+                        .help("Run as a Language Server (LSP) over stdio")
+                        .action(clap::ArgAction::SetTrue),
                 )
                 .arg(
                     Arg::new("check")
@@ -172,6 +180,9 @@ fn main() -> Result<()> {
 }
 
 fn run_ovft(matches: &ArgMatches) -> Result<()> {
+    if matches.get_flag("lsp") {
+        return lsp::run(matches.get_one::<String>("config").cloned());
+    }
     if let Some(("release-notes", sub_matches)) = matches.subcommand() {
         return run_release_notes(sub_matches);
     }

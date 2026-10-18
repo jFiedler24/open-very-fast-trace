@@ -160,3 +160,8 @@ $RECYCLE.BIN/
 .directory
 .Trash-*
 .nfs*
+
+# Zed extension build output
+ovft-zed/target/
+ovft-zed/Cargo.lock
+ovft-zed/extension.wasm

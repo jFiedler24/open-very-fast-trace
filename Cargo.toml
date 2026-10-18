@@ -5,6 +5,7 @@ members = [
     "cargo-ovft",
     "ovft-wasm"
 ]
+exclude = ["ovft-zed"]
 resolver = "2"
 
 [workspace.dependencies]
