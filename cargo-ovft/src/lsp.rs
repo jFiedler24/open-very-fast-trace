@@ -465,7 +465,7 @@ fn hover_markdown(result: &TraceResult, id: &SpecificationItemId) -> String {
     let Some(item) = find_item(result, id) else {
         return format!("**`{id}`**\n\n_Unknown item (no definition found)._");
     };
-    let mut md = format!("**{}**\n\n`{}`", item.title(), item.id());
+    let mut md = format!("**{}**\n\n`{}`", md_escape_ids(&item.title()), item.id());
     md.push_str(&format!("\n\nCoverage: **{}**", item.coverage_status));
     if item.is_defect {
         md.push_str(" ⚠️");
@@ -667,8 +667,8 @@ mod tests {
     fn hover_shows_title_and_links() {
         let r = trace();
         let md = hover_markdown(&r, &SpecificationItemId::parse("req~a~1").unwrap());
-        assert!(md.contains("title of req~a~1"));
-        assert!(md.contains("impl~a~1"));
+        assert!(md.contains("title of `req~a~1`"));
+        assert!(md.contains("`impl~a~1`"));
         let unknown = hover_markdown(&r, &SpecificationItemId::parse("req~nope~1").unwrap());
         assert!(unknown.contains("Unknown"));
     }

@@ -8,6 +8,7 @@
 
 import * as vscode from "vscode";
 import { TraceEngine, TraceLinkedItem, TraceResult } from "./trace_engine";
+import { mdEscapeIds } from "./diagnostics";
 
 // ---------------------------------------------------------------------------
 // Tree item
@@ -31,8 +32,8 @@ export class RequirementTreeItem extends vscode.TreeItem {
     // Tooltip with full info (IDs in code spans: bare `~` pairs would render
     // as strikethrough in markdown)
     const lines: string[] = [`**\`${traceItem.id}\`**`];
-    if (traceItem.title) lines.push(`\n${traceItem.title}`);
-    if (traceItem.description) lines.push(`\n${traceItem.description}`);
+    if (traceItem.title) lines.push(`\n${mdEscapeIds(traceItem.title)}`);
+    if (traceItem.description) lines.push(`\n${mdEscapeIds(traceItem.description)}`);
     lines.push(`\nStatus: ${traceItem.coverage_status}`);
     if (traceItem.needs.length > 0) lines.push(`Needs: ${traceItem.needs.join(", ")}`);
     if (traceItem.covers.length > 0) {

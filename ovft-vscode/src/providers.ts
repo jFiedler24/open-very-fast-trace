@@ -20,6 +20,7 @@ import {
   TagLocation,
 } from "./index";
 import type { TraceEngine } from "./trace_engine";
+import { mdEscapeIds } from "./diagnostics";
 
 // ---------------------------------------------------------------------------
 // Definition provider  —  from tag → go to spec, from spec → go to spec
@@ -274,10 +275,10 @@ export class OvftHoverProvider implements vscode.HoverProvider {
 
     // Show title and description from the trace result
     if (traceItem?.title) {
-      md.appendMarkdown(`### ${traceItem.title}\n\n`);
+      md.appendMarkdown(`### ${mdEscapeIds(traceItem.title)}\n\n`);
     }
     if (traceItem?.description) {
-      md.appendMarkdown(`${traceItem.description}\n\n`);
+      md.appendMarkdown(`${mdEscapeIds(traceItem.description)}\n\n`);
     }
 
     if (specs.length > 0) {
@@ -476,7 +477,7 @@ export class OvftNeedsDecorationManager implements vscode.Disposable {
           } else {
             uncoveredRanges.push({
               range,
-              hoverMessage: `⚠ ${trimmed} coverage missing for ${currentSpecId}`,
+              hoverMessage: `⚠ ${trimmed} coverage missing for \`${currentSpecId}\``,
             });
           }
 
