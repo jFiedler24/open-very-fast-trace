@@ -25,3 +25,4 @@ zip = { workspace = true }
 lsp-server = "0.10"
 lsp-types = "0.97"
 log = { workspace = true }
+regex = { workspace = true }

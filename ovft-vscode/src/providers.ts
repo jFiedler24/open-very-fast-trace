@@ -289,7 +289,7 @@ export class OvftHoverProvider implements vscode.HoverProvider {
           md.appendMarkdown(`  - Needs: ${s.needs.join(", ")}\n`);
         }
         if (s.covers.length > 0) {
-          md.appendMarkdown(`  - Covers: ${s.covers.map(reqIdToString).join(", ")}\n`);
+          md.appendMarkdown(`  - Covers: ${s.covers.map((c) => `\`${reqIdToString(c)}\``).join(", ")}\n`);
         }
       }
     } else {

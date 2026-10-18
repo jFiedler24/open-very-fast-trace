@@ -28,13 +28,16 @@ export class RequirementTreeItem extends vscode.TreeItem {
     // Show title as description next to the ID
     this.description = traceItem.title ?? traceItem.coverage_status;
 
-    // Tooltip with full info
-    const lines: string[] = [`**${traceItem.id}**`];
+    // Tooltip with full info (IDs in code spans: bare `~` pairs would render
+    // as strikethrough in markdown)
+    const lines: string[] = [`**\`${traceItem.id}\`**`];
     if (traceItem.title) lines.push(`\n${traceItem.title}`);
     if (traceItem.description) lines.push(`\n${traceItem.description}`);
     lines.push(`\nStatus: ${traceItem.coverage_status}`);
     if (traceItem.needs.length > 0) lines.push(`Needs: ${traceItem.needs.join(", ")}`);
-    if (traceItem.covers.length > 0) lines.push(`Covers: ${traceItem.covers.join(", ")}`);
+    if (traceItem.covers.length > 0) {
+      lines.push(`Covers: ${traceItem.covers.map((c) => `\`${c}\``).join(", ")}`);
+    }
     const tip = new vscode.MarkdownString(lines.join("\n"));
     tip.isTrusted = true;
     this.tooltip = tip;

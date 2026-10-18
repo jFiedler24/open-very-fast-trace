@@ -7,6 +7,19 @@
 import * as vscode from "vscode";
 import { TraceResult, TraceDefect } from "./trace_engine";
 
+/**
+ * Wrap bare requirement IDs (`type~name~rev`) in code spans. Diagnostic
+ * messages are rendered as markdown in the editor hover, where the `~`
+ * pair would otherwise show as strikethrough.
+ */
+export function mdEscapeIds(text: string): string {
+  return text.replace(
+    /(`?)\b([a-z][a-z0-9]*)~([a-zA-Z0-9._-]+)~(\d+)\b/g,
+    (_match, backtick, _type, _name, _rev) =>
+      backtick === "`" ? _match : `\`${_match}\``
+  );
+}
+
 export class OvftDiagnosticsProvider implements vscode.Disposable {
   private collection: vscode.DiagnosticCollection;
 
@@ -38,7 +51,7 @@ export class OvftDiagnosticsProvider implements vscode.Disposable {
         const line = d.line ? d.line - 1 : 0;
         const range = new vscode.Range(line, 0, line, Number.MAX_SAFE_INTEGER);
         const severity = defectSeverity(d.defect_type);
-        const diag = new vscode.Diagnostic(range, d.description, severity);
+        const diag = new vscode.Diagnostic(range, mdEscapeIds(d.description), severity);
         diag.source = "OVFT";
         diag.code = d.defect_type;
         return diag;

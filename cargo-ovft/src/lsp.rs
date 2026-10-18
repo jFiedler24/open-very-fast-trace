@@ -375,8 +375,8 @@ fn collect_diagnostics(
                 .defects
                 .iter()
                 .find(|d| d.item_id.as_ref() == Some(item.id()))
-                .map(|d| d.description.clone())
-                .unwrap_or_else(|| format!("{} is not covered", item.id()));
+                .map(|d| md_escape_ids(&d.description))
+                .unwrap_or_else(|| format!("`{}` is not covered", item.id()));
             push(path.clone(), loc.line, DiagnosticSeverity::WARNING, desc);
         }
         for link in &item.outgoing_links {
@@ -385,12 +385,34 @@ fn collect_diagnostics(
                     path.clone(),
                     loc.line,
                     DiagnosticSeverity::ERROR,
-                    format!("{} covers {}: {}", item.id(), link.target_id, link.status),
+                    format!(
+                        "`{}` covers `{}`: {}",
+                        item.id(),
+                        link.target_id,
+                        link.status
+                    ),
                 );
             }
         }
     }
     out
+}
+
+/// Wrap bare requirement IDs (`type~name~rev`) in markdown code spans.
+/// Diagnostic messages are rendered as markdown by clients, where the `~`
+/// pair would otherwise show as strikethrough.
+fn md_escape_ids(text: &str) -> String {
+    static RE: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+    let re = RE.get_or_init(|| regex::Regex::new(r"(`?)([a-z][a-z0-9]*)~([a-zA-Z0-9._-]+)~(\d+)\b").unwrap());
+    re.replace_all(text, |caps: &regex::Captures| {
+        // IDs already inside a code span are left alone.
+        if &caps[1] == "`" {
+            caps[0].to_string()
+        } else {
+            format!("`{}`", &caps[0])
+        }
+    })
+    .into_owned()
 }
 
 fn is_id_char(c: char) -> bool {
@@ -598,6 +620,47 @@ mod tests {
         assert!(src
             .iter()
             .any(|x| x.range.start.line == 11 && x.message.contains("orphaned")));
+    }
+
+    #[test]
+    fn diagnostics_escape_ids_for_markdown() {
+        let r = trace();
+        let d = collect_diagnostics(&r, Path::new("/ws"), |_| None);
+
+        let src = &d[&PathBuf::from("/ws/src/lib.rs")];
+        let orphaned = src
+            .iter()
+            .find(|x| x.message.contains("orphaned"))
+            .expect("orphaned diagnostic");
+        assert!(
+            orphaned
+                .message
+                .contains("`impl~ghost~1` covers `req~missing~1`"),
+            "IDs must be code-spanned, got: {}",
+            orphaned.message
+        );
+
+        let spec = &d[&PathBuf::from("/ws/docs/spec.md")];
+        let uncovered = spec
+            .iter()
+            .find(|x| x.message.contains("needs coverage") || x.message.contains("not covered"))
+            .expect("uncovered diagnostic");
+        assert!(
+            uncovered.message.contains("`req~lonely~1`"),
+            "IDs must be code-spanned, got: {}",
+            uncovered.message
+        );
+    }
+
+    #[test]
+    fn md_escape_ids_wraps_only_bare_ids() {
+        assert_eq!(
+            md_escape_ids("Item req~a~1 covers dsn~b-2~3."),
+            "Item `req~a~1` covers `dsn~b-2~3`."
+        );
+        assert_eq!(md_escape_ids("no ids here"), "no ids here");
+        // already code-spanned IDs are left alone
+        assert_eq!(md_escape_ids("`req~a~1`"), "`req~a~1`");
     }
 
     #[test]
