@@ -59,3 +59,20 @@ verbose = false
 
 # Output directory for reports
 output_dir = "target"
+
+# Status-based coverage configuration.
+# Only items with a counted status contribute to the headline coverage
+# statistics; draft and rejected items stay visible in reports (marked as
+# "not counted") but do not affect coverage figures or the check exit code.
+[status]
+count = ["proposed", "approved"]
+
+# Per-status policy for `cargo ovft --check`:
+# "fail" = defects of items with this status fail the check (exit code 1),
+# "ignore" = defects are reported but never fail the check.
+# Statuses not listed here default to "fail".
+[status.check]
+draft = "ignore"
+proposed = "fail"
+approved = "fail"
+rejected = "ignore"

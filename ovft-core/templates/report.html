@@ -49,6 +49,27 @@
                 {%- endfor -%}
             </div>
             {%- endif -%}
+            {%- if !status_rows.is_empty() -%}
+            <div class="status-overview">
+                <h3>Coverage by item status</h3>
+                <table class="status-table">
+                    <thead>
+                        <tr><th>Status</th><th>Items</th><th>Covered</th><th>Coverage</th><th>Headline stats</th></tr>
+                    </thead>
+                    <tbody>
+                        {%- for row in status_rows -%}
+                        <tr>
+                            <td><span class="status-name">{{ row.status }}</span></td>
+                            <td>{{ row.total }}</td>
+                            <td>{{ row.covered }}</td>
+                            <td>{{ "{:.1}"|format(row.percentage) }}%</td>
+                            <td>{%- if row.counted -%}<span class="counted-yes">counted</span>{%- else -%}<span class="counted-no">not counted</span>{%- endif -%}</td>
+                        </tr>
+                        {%- endfor -%}
+                    </tbody>
+                </table>
+            </div>
+            {%- endif -%}
             <div class="charts-grid">
                 <div class="chart-card">
                     <h3>Coverage status</h3>
@@ -178,6 +199,9 @@
                     <div class="item-header">
                         <button type="button" class="item-toggle" aria-expanded="true" aria-label="Toggle item details" title="Collapse/expand">▾</button>
                         <h4 class="item-title">{{ item.title() }}</h4>
+                        {%- if !item.counted -%}
+                        <span class="not-counted-badge" title="Items with status '{{ item.item.status }}' are excluded from headline coverage by configuration">not counted</span>
+                        {%- endif -%}
                         <span class="coverage-badge coverage-{{ item.coverage_status }}">{{ item.coverage_status }}</span>
                     </div>
                     <div class="item-id-row">
@@ -302,7 +326,7 @@
                             <td>{{ item.title() }}</td>
                             <td data-val="{{ item.item.id.artifact_type }}">{{ item.item.id.artifact_type }}</td>
                             <td data-val="{{ item.coverage_status }}"><span class="coverage-badge coverage-{{ item.coverage_status }}">{{ item.coverage_status }}</span></td>
-                            <td data-val="{{ item.item.status }}">{{ item.item.status }}</td>
+                            <td data-val="{{ item.item.status }}">{{ item.item.status }}{%- if !item.counted -%} <span class="counted-no" title="Excluded from headline coverage by configuration">(excluded)</span>{%- endif -%}</td>
                             <td data-val="{% if item.is_defect %}1{% else %}0{% endif %}">{% if item.is_defect %}<span class="defect-mark" title="Has defects">⚠</span>{% endif %}</td>
                         </tr>
                         {%- endfor -%}

@@ -153,3 +153,17 @@ This document defines the high-level features for the Open Very Fast Trace (OVFT
 **Tags:** interoperability, reqif, import, export
 
 **Needs:** req
+
+---
+
+## feat~status-aware-coverage~1
+
+**Title:** Status-aware coverage statistics and checks
+
+**Description:** The system shall weight coverage statistics and `cargo ovft --check` by the status of specification items, so that draft and rejected (declined) requirements do not count against coverage, while proposed (reviewed) and accepted (approved) requirements count fully.
+
+**Rationale:** Requirements under preparation or explicitly declined must not fail CI or distort coverage figures; teams need per-status visibility to see when a draft matures into an obligation.
+
+**Tags:** coverage, status, configuration, ci
+
+**Needs:** req

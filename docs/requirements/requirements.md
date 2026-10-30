@@ -257,3 +257,57 @@ This document defines the detailed requirements for the Open Very Fast Trace (OV
 **Tags:** interoperability, reqif, export
 
 **Needs:** impl
+
+---
+
+## req~status-filtered-coverage~1
+
+**Title:** Coverage statistics respect item status
+
+**Description:** The system shall count only items whose status is configured as counted (by default `proposed` and `approved`) toward headline coverage statistics. Items with an excluded status (by default `draft` and `rejected`) shall remain visible in reports with their status and per-status coverage, but shall not lower the overall coverage figure, the per-artifact-type coverage, or the coverage percentage.
+
+**Covers:** feat~status-aware-coverage~1
+
+**Status:** draft
+
+**Rationale:** A declined requirement or a work-in-progress draft must not fail CI or distort coverage figures, but hiding it entirely would lose the information that it exists.
+
+**Tags:** coverage, status, configuration
+
+**Needs:** dsn
+
+---
+
+## req~status-coverage-overview~1
+
+**Title:** Per-status coverage overview in reports
+
+**Description:** The tracing reports (HTML and plain text) shall provide an overview of coverage per item status: the number of items with that status, how many of them are covered, the coverage percentage within the status, and whether the status is counted toward headline coverage.
+
+**Covers:** feat~status-aware-coverage~1
+
+**Status:** draft
+
+**Rationale:** Teams need to see at a glance that all accepted requirements are covered while drafts are still maturing, and which statuses count toward the headline figures.
+
+**Tags:** reporting, coverage, status
+
+**Needs:** dsn
+
+---
+
+## req~status-check-policy~1
+
+**Title:** Configurable per-status check policy
+
+**Description:** The `.ovft.toml` configuration shall provide a `[status]` section with a `count` list selecting the statuses that count toward headline coverage, and a `[status.check]` table mapping each status to `fail` or `ignore`. `cargo ovft --check` shall exit with a non-zero code only when a defect violates the policy, i.e. belongs to an item whose status maps to `fail`; defects of items whose status maps to `ignore` shall be reported but shall not fail the check. Statuses not listed in `[status.check]` shall default to `fail`.
+
+**Covers:** feat~status-aware-coverage~1
+
+**Status:** draft
+
+**Rationale:** Projects differ in how strictly they want to enforce coverage of drafts; the policy must be configurable without code changes and conservative by default.
+
+**Tags:** configuration, ci, coverage, status
+
+**Needs:** dsn

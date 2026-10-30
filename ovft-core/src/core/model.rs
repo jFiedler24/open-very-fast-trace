@@ -64,7 +64,7 @@ impl fmt::Display for SpecificationItemId {
 }
 
 /// Status of a specification item
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum ItemStatus {
     Draft,
     Proposed,
@@ -370,6 +370,14 @@ pub struct LinkedSpecificationItem {
     pub coverage_status: CoverageStatus,
     /// Whether this item has defects
     pub is_defect: bool,
+    /// Whether this item counts toward headline coverage statistics,
+    /// based on its status and the configured counted statuses
+    #[serde(default = "default_counted")]
+    pub counted: bool,
+}
+
+fn default_counted() -> bool {
+    true
 }
 
 /// A link between specification items
@@ -434,6 +442,19 @@ pub struct CoverageSummary {
     pub status: CoverageStatus,
 }
 
+/// Coverage summary for all items sharing one status
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StatusCoverageSummary {
+    /// Total number of items with this status
+    pub total: usize,
+    /// Number of covered items with this status
+    pub covered: usize,
+    /// Coverage percentage within this status
+    pub percentage: f64,
+    /// Whether items with this status count toward headline coverage statistics
+    pub counted: bool,
+}
+
 impl LinkedSpecificationItem {
     pub fn new(item: SpecificationItem) -> Self {
         Self {
@@ -442,6 +463,7 @@ impl LinkedSpecificationItem {
             incoming_links: Vec::new(),
             coverage_status: CoverageStatus::Uncovered,
             is_defect: false,
+            counted: true,
         }
     }
 

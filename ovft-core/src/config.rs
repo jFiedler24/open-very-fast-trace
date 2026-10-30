@@ -1,5 +1,105 @@
+use crate::core::ItemStatus;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::path::PathBuf;
+
+/// How `cargo ovft --check` treats defects of items with a given status
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum StatusCheckPolicy {
+    /// Defects of items with this status fail the check
+    Fail,
+    /// Defects of items with this status are reported but never fail the check
+    Ignore,
+}
+
+/// Status-based coverage and check configuration (`[status]` in .ovft.toml)
+/// [impl->dsn~status-check-policy-config~1]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct StatusConfig {
+    /// Statuses whose items count toward headline coverage statistics
+    #[serde(with = "status_list_serde")]
+    pub count: Vec<ItemStatus>,
+    /// Per-status policy deciding whether defects fail `cargo ovft --check`
+    #[serde(with = "status_check_map_serde")]
+    pub check: BTreeMap<ItemStatus, StatusCheckPolicy>,
+}
+
+impl Default for StatusConfig {
+    fn default() -> Self {
+        let mut check = BTreeMap::new();
+        check.insert(ItemStatus::Draft, StatusCheckPolicy::Ignore);
+        check.insert(ItemStatus::Proposed, StatusCheckPolicy::Fail);
+        check.insert(ItemStatus::Approved, StatusCheckPolicy::Fail);
+        check.insert(ItemStatus::Rejected, StatusCheckPolicy::Ignore);
+        Self {
+            count: vec![ItemStatus::Proposed, ItemStatus::Approved],
+            check,
+        }
+    }
+}
+
+impl StatusConfig {
+    /// Whether items with the given status count toward headline coverage
+    pub fn is_counted(&self, status: &ItemStatus) -> bool {
+        self.count.contains(status)
+    }
+
+    /// The check policy for the given status (defaults to `Fail` for unlisted statuses)
+    pub fn check_policy(&self, status: &ItemStatus) -> StatusCheckPolicy {
+        self.check.get(status).copied().unwrap_or(StatusCheckPolicy::Fail)
+    }
+}
+
+/// Serde helpers representing `ItemStatus` as its lowercase name (as in markdown specs)
+mod status_list_serde {
+    use crate::core::ItemStatus;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub fn serialize<S: Serializer>(statuses: &[ItemStatus], s: S) -> Result<S::Ok, S::Error> {
+        let names: Vec<String> = statuses.iter().map(ToString::to_string).collect();
+        names.serialize(s)
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<ItemStatus>, D::Error> {
+        let names = Vec::<String>::deserialize(d)?;
+        names
+            .iter()
+            .map(|n| {
+                n.parse::<ItemStatus>().map_err(serde::de::Error::custom)
+            })
+            .collect()
+    }
+}
+
+/// Serde helpers representing the check policy map with lowercase status keys
+mod status_check_map_serde {
+    use crate::core::ItemStatus;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use std::collections::BTreeMap;
+
+    pub fn serialize<S: Serializer>(
+        map: &BTreeMap<ItemStatus, super::StatusCheckPolicy>,
+        s: S,
+    ) -> Result<S::Ok, S::Error> {
+        let names: BTreeMap<String, super::StatusCheckPolicy> = map
+            .iter()
+            .map(|(k, v)| (k.to_string(), *v))
+            .collect();
+        names.serialize(s)
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(
+        d: D,
+    ) -> Result<BTreeMap<ItemStatus, super::StatusCheckPolicy>, D::Error> {
+        let names = BTreeMap::<String, super::StatusCheckPolicy>::deserialize(d)?;
+        names
+            .into_iter()
+            .map(|(k, v)| k.parse::<ItemStatus>().map(|s| (s, v)).map_err(serde::de::Error::custom))
+            .collect()
+    }
+}
 
 /// Configuration for the requirements tracing process
 /// [impl->dsn~configuration-system~1]
@@ -22,6 +122,9 @@ pub struct Config {
     /// Artifact types included in release notes (cargo ovft release-notes)
     #[serde(default = "crate::release_notes::default_release_note_types")]
     pub release_note_types: Vec<String>,
+    /// Status-based coverage counting and check policy
+    #[serde(default)]
+    pub status: StatusConfig,
 }
 
 impl Default for Config {
@@ -72,6 +175,7 @@ impl Default for Config {
             verbose: false,
             output_dir: Some(PathBuf::from("target")),
             release_note_types: crate::release_notes::default_release_note_types(),
+            status: StatusConfig::default(),
         }
     }
 }
@@ -100,6 +204,7 @@ impl Config {
             verbose: false,
             output_dir: Some(PathBuf::from("target")),
             release_note_types: crate::release_notes::default_release_note_types(),
+            status: StatusConfig::default(),
         }
     }
 
@@ -288,5 +393,71 @@ mod tests {
         // This should not panic and return a valid config
         let config = Config::load_or_default();
         assert!(!config.artifact_types.is_empty());
+    }
+
+    #[test]
+    fn test_status_config_defaults() {
+        let config = Config::default();
+        assert!(config.status.is_counted(&crate::core::ItemStatus::Proposed));
+        assert!(config.status.is_counted(&crate::core::ItemStatus::Approved));
+        assert!(!config.status.is_counted(&crate::core::ItemStatus::Draft));
+        assert!(!config.status.is_counted(&crate::core::ItemStatus::Rejected));
+        assert_eq!(
+            config.status.check_policy(&crate::core::ItemStatus::Draft),
+            StatusCheckPolicy::Ignore
+        );
+        assert_eq!(
+            config.status.check_policy(&crate::core::ItemStatus::Approved),
+            StatusCheckPolicy::Fail
+        );
+    }
+
+    #[test]
+    fn test_status_config_from_toml() {
+        let toml_str = r#"
+            source_dirs = ["src"]
+            spec_dirs = ["docs"]
+            source_patterns = ["*.rs"]
+            exclude_patterns = ["target/**"]
+            artifact_types = ["req"]
+            verbose = false
+
+            [status]
+            count = ["approved"]
+
+            [status.check]
+            draft = "fail"
+            approved = "fail"
+        "#;
+        let config: Config = toml::from_str(toml_str).unwrap();
+        assert!(config.status.is_counted(&crate::core::ItemStatus::Approved));
+        assert!(!config.status.is_counted(&crate::core::ItemStatus::Proposed));
+        assert_eq!(
+            config.status.check_policy(&crate::core::ItemStatus::Draft),
+            StatusCheckPolicy::Fail
+        );
+        // Unlisted statuses keep the conservative default
+        assert_eq!(
+            config.status.check_policy(&crate::core::ItemStatus::Rejected),
+            StatusCheckPolicy::Fail
+        );
+    }
+
+    #[test]
+    fn test_status_config_rejects_unknown_status() {
+        let toml_str = r#"
+            [status]
+            count = ["wip"]
+        "#;
+        assert!(toml::from_str::<Config>(toml_str).is_err());
+    }
+
+    #[test]
+    fn test_status_config_serialization_roundtrip() {
+        let config = Config::default();
+        let toml_str = toml::to_string_pretty(&config).unwrap();
+        let deserialized: Config = toml::from_str(&toml_str).unwrap();
+        assert_eq!(config.status.count, deserialized.status.count);
+        assert_eq!(config.status.check, deserialized.status.check);
     }
 }

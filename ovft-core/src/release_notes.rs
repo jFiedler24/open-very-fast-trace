@@ -249,10 +249,12 @@ mod tests {
     fn trace_result(items: Vec<LinkedSpecificationItem>) -> TraceResult {
         TraceResult {
             total_items: items.len(),
+            status_summary: TraceResult::compute_status_summary(&items, &[]),
             items,
             defect_count: 0,
             defects: vec![],
             coverage_summary: HashMap::new(),
+            check_defect_count: 0,
             is_success: true,
         }
     }

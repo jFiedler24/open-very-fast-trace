@@ -357,16 +357,26 @@ fn run_ovft(matches: &ArgMatches) -> Result<()> {
         }
     }
 
-    // Check mode: exit with error if issues found
+    // Check mode: exit with error if issues found. Defects of statuses
+    // configured as "ignore" in .ovft.toml ([status.check]) are reported but
+    // never fail the check.
+    // [impl->dsn~status-check-policy-config~1]
     if check_mode {
-        if trace_result.defect_count > 0 {
+        if trace_result.check_defect_count > 0 {
             eprintln!(
-                "❌ Found {} defects in requirements traceability",
-                trace_result.defect_count
+                "❌ Found {} defects in requirements traceability ({} fail the configured status check policy)",
+                trace_result.defect_count, trace_result.check_defect_count
             );
             std::process::exit(1);
         } else {
-            println!("✅ No requirements traceability issues found");
+            if trace_result.defect_count > 0 {
+                println!(
+                    "✅ No requirements traceability issues found ({} defect(s) excluded by the status check policy)",
+                    trace_result.defect_count
+                );
+            } else {
+                println!("✅ No requirements traceability issues found");
+            }
         }
     }
 

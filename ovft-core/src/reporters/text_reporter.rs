@@ -143,6 +143,27 @@ impl PlainTextReporter {
                 coverage_word(&summary.status),
             );
         }
+
+        // Per-status overview: every status, whether its items count toward
+        // headline coverage, and how well covered they are.
+        // [impl->dsn~status-overview-reporting~1]
+        for (status, summary) in &result.status_summary {
+            if let Some(filter_status) = &self.filter.item_status {
+                if filter_status != status {
+                    continue;
+                }
+            }
+            let marker = if summary.counted { "counted" } else { "not counted" };
+            let _ = writeln!(
+                out,
+                "  {:<8} {:>3}/{:<3} ({:>5.1}%) {}",
+                status.to_string(),
+                summary.covered,
+                summary.total,
+                summary.percentage,
+                marker,
+            );
+        }
         if !self.filter.is_empty() {
             let _ = writeln!(out, "  (filtered: {})", self.filter.describe());
         }
@@ -175,13 +196,15 @@ impl PlainTextReporter {
                     crate::core::CoverageStatus::Uncovered => "x",
                 }
             };
+            let counted_marker = if item.counted { "" } else { " [not counted]" };
             let _ = writeln!(
                 out,
-                "  [{}] {:<28} {:<9} {}",
+                "  [{}] {:<28} {:<9} {}{}",
                 flag,
                 item.item.id.to_string(),
                 item.item.status,
                 item.title(),
+                counted_marker,
             );
             for link in &item.outgoing_links {
                 let _ = writeln!(out, "        covers {} ({})", link.target_id, link.status);
@@ -277,11 +300,28 @@ mod tests {
 
     #[test]
     fn summary_shows_coverage_rows() {
-        let r = sample();
+        // Both items approved so both count toward coverage statistics
+        let items = vec![
+            mk("req~a~1", ItemStatus::Approved, &["dsn"], &[]),
+            mk("dsn~a~1", ItemStatus::Approved, &[], &["req~a~1"]),
+        ];
+        let linked = Linker::new().link_items(items).unwrap();
+        let r = Tracer::new(Config::empty()).analyze_trace(&linked);
         let out = PlainTextReporter::new(Verbosity::Summary, ReportFilter::default()).render(&r);
         assert!(out.contains("req"));
         assert!(out.contains("dsn"));
         assert!(out.contains("covered"));
+    }
+
+    #[test]
+    fn summary_shows_status_overview_with_counted_flag() {
+        let r = sample();
+        let out = PlainTextReporter::new(Verbosity::Summary, ReportFilter::default()).render(&r);
+        // Both statuses of the sample appear in the per-status overview
+        assert!(out.contains("draft"));
+        assert!(out.contains("approved"));
+        assert!(out.contains("counted"));
+        assert!(out.contains("not counted"));
     }
 
     #[test]
@@ -306,6 +346,8 @@ mod tests {
         assert!(out.contains("dsn~a~1"));
         assert!(out.contains("covers req~a~1 (covers)"));
         assert!(out.contains("draft"));
+        // The draft design item is excluded from headline coverage
+        assert!(out.contains("[not counted]"));
     }
 
     #[test]

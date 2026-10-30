@@ -843,6 +843,72 @@ html {
     color: #721c24;
 }
 
+/* Per-status coverage overview */
+.status-overview {
+    margin-top: 16px;
+}
+
+.status-overview h3 {
+    margin: 0 0 8px;
+    font-size: 0.95rem;
+    color: #2c3e50;
+}
+
+.status-table {
+    width: 100%;
+    max-width: 640px;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.status-table th,
+.status-table td {
+    text-align: left;
+    padding: 6px 10px;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.status-table th {
+    color: #5a6b7b;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.72rem;
+    letter-spacing: 0.5px;
+}
+
+.status-table .status-name {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-size: 0.78rem;
+    color: #2c3e50;
+}
+
+.counted-yes {
+    color: #155724;
+    font-weight: 600;
+    font-size: 0.78rem;
+}
+
+.counted-no {
+    color: #856404;
+    font-weight: 600;
+    font-size: 0.78rem;
+}
+
+.not-counted-badge {
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    background-color: #e2e3e5;
+    color: #5a6b7b;
+    border: 1px dashed #b8c2cc;
+}
+
 /* Items header + filter bar */
 .items-header {
     margin-bottom: 20px;

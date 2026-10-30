@@ -225,9 +225,37 @@ The artifact types included are configurable via `release_note_types` in `.ovft.
 
 ## Readability Features
 
-- The HTML report leads with each item's human-readable title, shows the full ID and aliases as badges, summarizes coverage per artifact type, and offers a filter bar (text, artifact type, item status, coverage). Item details collapse/expand, a sortable table view lists every item, and inline SVG charts (coverage donut, per-type bars, defect breakdown) plus traceability graphs (artifact-type flow and an item-level graph whose nodes link back to the item cards) render offline with no JavaScript libraries. A Mermaid flowchart of the graph can be copied from the report or exported with `cargo ovft --mermaid [FILE]`.
-- Plain-text reports for terminals and CI logs come in four verbosity levels: `cargo ovft -f text` (one-line verdict), `-v` (coverage summary), `-vv` (plus defects), `-vvv` (plus every item and its links). Filter with `--wanted-types req,dsn` and `--status approved`.
+- The HTML report leads with each item's human-readable title, shows the full ID and aliases as badges, summarizes coverage per artifact type and per item status, and offers a filter bar (text, artifact type, item status, coverage). Item details collapse/expand, a sortable table view lists every item, and inline SVG charts (coverage donut, per-type bars, defect breakdown) plus traceability graphs (artifact-type flow and an item-level graph whose nodes link back to the item cards) render offline with no JavaScript libraries. A Mermaid flowchart of the graph can be copied from the report or exported with `cargo ovft --mermaid [FILE]`.
+- Plain-text reports for terminals and CI logs come in four verbosity levels: `cargo ovft -f text` (one-line verdict), `-v` (coverage summary, including one row per item status), `-vv` (plus defects), `-vvv` (plus every item and its links). Filter with `--wanted-types req,dsn` and `--status approved`.
 - The VS Code extension hides lines that contain only coverage tags, showing a small inline badge instead (the raw line reappears while the cursor is on it). Toggle with the `OVFT: Toggle Tag Visibility` command or the `ovft.hideTags` setting.
+
+---
+
+## Status-Aware Coverage
+
+Every specification item carries a status (`draft`, `proposed`, `approved`, `rejected`, set in the spec with `**Status:** draft`; items default to `approved`). Coverage statistics and `cargo ovft --check` respect it:
+
+- Items with a **counted** status (default: `proposed`, `approved`) contribute fully to the headline coverage figures.
+- Items with an **excluded** status (default: `draft`, `rejected`) stay visible in the reports — with a per-status overview row and a "not counted" badge on the item — but do not lower the coverage percentage, the per-artifact-type coverage, or fail the check.
+- Both report formats summarize coverage per status: items, covered, percentage, and whether the status counts.
+
+Configure the behavior in `.ovft.toml`:
+
+```toml
+# Statuses whose items count toward headline coverage statistics
+[status]
+count = ["proposed", "approved"]
+
+# Whether defects of a status fail `cargo ovft --check`
+# (statuses not listed default to "fail")
+[status.check]
+draft = "ignore"
+proposed = "fail"
+approved = "fail"
+rejected = "ignore"
+```
+
+With this configuration a declined requirement or an unfinished draft can live in the specs without breaking CI: `cargo ovft --check` exits non-zero only when a defect violates the policy, and reports excluded defects as informational.
 
 ---
 
@@ -336,3 +364,5 @@ source_dirs = ["src", "tests"]
 ```
 
 `spec_dirs` are scanned recursively for `.md` files. `source_dirs` are scanned recursively for source files matching `source_patterns`.
+
+Status-based coverage and check policy are configured in the `[status]` section — see [Status-Aware Coverage](#status-aware-coverage).

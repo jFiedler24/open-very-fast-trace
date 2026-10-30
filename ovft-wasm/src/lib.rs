@@ -30,6 +30,10 @@ pub struct JsTraceResult {
     pub defects: Vec<JsDefect>,
     pub items: Vec<JsLinkedItem>,
     pub coverage_summary: HashMap<String, JsCoverageSummary>,
+    #[serde(default)]
+    pub status_summary: HashMap<String, JsStatusSummary>,
+    #[serde(default)]
+    pub check_defect_count: usize,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -52,15 +56,35 @@ pub struct JsLinkedItem {
     pub aliases: Vec<String>,
     #[serde(default)]
     pub attributes: Vec<(String, String)>,
+    #[serde(default = "default_item_status")]
+    pub status: String,
     pub needs: Vec<String>,
     pub covers: Vec<String>,
     pub depends: Vec<String>,
     pub coverage_status: String,
     pub is_defect: bool,
+    #[serde(default = "default_counted")]
+    pub counted: bool,
     pub file_path: Option<String>,
     pub line: Option<u32>,
     pub incoming_links: Vec<JsLink>,
     pub outgoing_links: Vec<JsLink>,
+}
+
+fn default_item_status() -> String {
+    "approved".to_string()
+}
+
+fn default_counted() -> bool {
+    true
+}
+
+#[derive(Serialize, Deserialize, Default, Clone)]
+pub struct JsStatusSummary {
+    pub total: usize,
+    pub covered: usize,
+    pub percentage: f64,
+    pub counted: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -92,11 +116,13 @@ fn to_js_linked_item(item: &LinkedSpecificationItem) -> JsLinkedItem {
         description: item.item.description.clone(),
         aliases: item.item.aliases.clone(),
         attributes: item.item.attributes.clone(),
+        status: item.item.status.to_string(),
         needs: item.item.needs.clone(),
         covers: item.item.covers.iter().map(|c| c.to_string()).collect(),
         depends: item.item.depends.iter().map(|d| d.to_string()).collect(),
         coverage_status: item.coverage_status.to_string(),
         is_defect: item.is_defect,
+        counted: item.counted,
         file_path: item.item.location.as_ref().map(|l| l.path.to_string_lossy().to_string()),
         line: item.item.location.as_ref().map(|l| l.line),
         incoming_links: item
@@ -169,6 +195,22 @@ fn to_js_trace_result(result: &TraceResult) -> JsTraceResult {
                 )
             })
             .collect(),
+        status_summary: result
+            .status_summary
+            .iter()
+            .map(|(k, v)| {
+                (
+                    k.to_string(),
+                    JsStatusSummary {
+                        total: v.total,
+                        covered: v.covered,
+                        percentage: v.percentage,
+                        counted: v.counted,
+                    },
+                )
+            })
+            .collect(),
+        check_defect_count: result.check_defect_count,
     }
 }
 
@@ -392,6 +434,9 @@ fn reconstruct_trace_result(js: &JsTraceResult) -> TraceResult {
             if let Some(loc) = location {
                 builder = builder.location(loc);
             }
+            let status: ovft_core::ItemStatus =
+                ji.status.parse().unwrap_or(ovft_core::ItemStatus::Approved);
+            builder = builder.status(status);
             builder = builder.covers_multiple(covers);
             for dep in depends {
                 builder = builder.depends(dep);
@@ -399,6 +444,7 @@ fn reconstruct_trace_result(js: &JsTraceResult) -> TraceResult {
 
             let mut linked = LinkedSpecificationItem::new(builder.build());
             linked.is_defect = ji.is_defect;
+            linked.counted = ji.counted;
             linked.coverage_status = match ji.coverage_status.as_str() {
                 "covered" => CoverageStatus::Covered,
                 "partial" => CoverageStatus::Partial,
@@ -464,12 +510,38 @@ fn reconstruct_trace_result(js: &JsTraceResult) -> TraceResult {
         })
         .collect();
 
+    let status_summary: std::collections::BTreeMap<ovft_core::ItemStatus, ovft_core::StatusCoverageSummary> =
+        if js.status_summary.is_empty() {
+            // Payload predates status summaries — derive one with the default policy
+            let default_counted = Config::empty().status.count;
+            TraceResult::compute_status_summary(&items, &default_counted)
+        } else {
+            js.status_summary
+                .iter()
+                .filter_map(|(k, v)| {
+                    k.parse::<ovft_core::ItemStatus>().ok().map(|status| {
+                        (
+                            status,
+                            ovft_core::StatusCoverageSummary {
+                                total: v.total,
+                                covered: v.covered,
+                                percentage: v.percentage,
+                                counted: v.counted,
+                            },
+                        )
+                    })
+                })
+                .collect()
+        };
+
     TraceResult {
         items,
         total_items: js.total_items,
         defect_count: js.defect_count,
         defects,
         coverage_summary,
+        status_summary,
+        check_defect_count: js.check_defect_count,
         is_success: js.is_success,
     }
 }

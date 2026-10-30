@@ -20,6 +20,7 @@ impl HtmlReporter {
     /// Render an HTML report to a String without writing to disk.
     /// This is the pure function used by WASM and the webview.
     /// [impl->req~title-first-report~1]
+    /// [impl->dsn~status-overview-reporting~1]
     pub fn render_report_html(&self, trace_result: &TraceResult) -> Result<String> {
         let processed_trace_result = self.process_markdown_content(trace_result);
 
@@ -40,6 +41,18 @@ impl HtmlReporter {
         item_statuses.sort();
         item_statuses.dedup();
 
+        let status_rows: Vec<StatusRow> = processed_trace_result
+            .status_summary
+            .iter()
+            .map(|(status, summary)| StatusRow {
+                status: status.to_string(),
+                total: summary.total,
+                covered: summary.covered,
+                percentage: summary.percentage,
+                counted: summary.counted,
+            })
+            .collect();
+
         let (trace_graph, trace_note) = crate::reporters::visuals::trace_graph_svg(
             &processed_trace_result,
             MAX_GRAPH_NODES,
@@ -51,6 +64,7 @@ impl HtmlReporter {
             coverage_strip,
             artifact_types,
             item_statuses,
+            status_rows,
             donut_html: crate::reporters::visuals::status_donut(&processed_trace_result),
             coverage_bars_html,
             defect_bars_html: crate::reporters::visuals::defect_bars(&processed_trace_result),
@@ -114,6 +128,8 @@ impl HtmlReporter {
             defect_count: trace_result.defect_count,
             defects: trace_result.defects.clone(),
             coverage_summary: trace_result.coverage_summary.clone(),
+            status_summary: trace_result.status_summary.clone(),
+            check_defect_count: trace_result.check_defect_count,
             is_success: trace_result.is_success,
         }
     }
@@ -136,6 +152,15 @@ impl HtmlReporter {
 /// Maximum number of item-graph nodes rendered in the HTML report.
 const MAX_GRAPH_NODES: usize = 150;
 
+/// One row of the per-status coverage overview in the report template.
+struct StatusRow {
+    status: String,
+    total: usize,
+    covered: usize,
+    percentage: f64,
+    counted: bool,
+}
+
 /// Template for generating HTML reports
 #[derive(Template)]
 #[template(path = "report.html")]
@@ -144,6 +169,7 @@ struct HtmlReportTemplate<'a> {
     coverage_strip: Vec<(String, crate::core::CoverageSummary)>,
     artifact_types: Vec<String>,
     item_statuses: Vec<String>,
+    status_rows: Vec<StatusRow>,
     donut_html: String,
     coverage_bars_html: String,
     defect_bars_html: String,
@@ -187,6 +213,8 @@ mod tests {
             defect_count: 0,
             defects: vec![],
             coverage_summary: HashMap::new(),
+            status_summary: std::collections::BTreeMap::new(),
+            check_defect_count: 0,
             is_success: true,
         };
 
@@ -195,6 +223,7 @@ mod tests {
             coverage_strip: vec![],
             artifact_types: vec![],
             item_statuses: vec![],
+            status_rows: vec![],
             donut_html: String::new(),
             coverage_bars_html: String::new(),
             defect_bars_html: String::new(),
@@ -209,5 +238,37 @@ mod tests {
         assert_eq!(template.trace_result.total_items, 1);
         assert!(template.trace_result.is_success);
         assert_eq!(template.css, "/* test css */");
+    }
+
+    #[test]
+    fn test_status_overview_rendered() {
+        use crate::core::{ItemStatus, Linker, SpecificationItem};
+        use crate::Tracer;
+
+        let covered = SpecificationItem::builder(SpecificationItemId::new(
+            "req".to_string(),
+            "ok".to_string(),
+            1,
+        ))
+        .status(ItemStatus::Approved)
+        .build();
+        let declined = SpecificationItem::builder(SpecificationItemId::new(
+            "req".to_string(),
+            "no".to_string(),
+            1,
+        ))
+        .status(ItemStatus::Rejected)
+        .needs("dsn".to_string())
+        .build();
+        let linked = Linker::new().link_items(vec![covered, declined]).unwrap();
+        let result = Tracer::new(Config::default()).analyze_trace(&linked);
+
+        let html = HtmlReporter::new(&Config::default())
+            .render_report_html(&result)
+            .unwrap();
+
+        assert!(html.contains("Coverage by item status"));
+        assert!(html.contains("rejected"));
+        assert!(html.contains("not counted"));
     }
 }

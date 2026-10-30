@@ -159,3 +159,57 @@ This document defines the design specifications for the Open Very Fast Trace (OV
 **Tags:** architecture, statistics, reporting
 
 **Needs:** impl
+
+---
+
+## dsn~status-aware-analysis~1
+
+**Title:** Status-aware coverage analysis
+
+**Description:** The tracer shall stamp every linked item with whether its status counts toward headline coverage, compute the per-artifact-type coverage summary and the coverage percentage over counted items only, and keep excluded items with their defects in the result so reports can still show them.
+
+**Covers:** req~status-filtered-coverage~1
+
+**Status:** draft
+
+**Rationale:** A single pass over the linked items produces both the headline statistics and the data needed to mark excluded items, avoiding divergence between analysis and reporting.
+
+**Tags:** architecture, analysis, coverage
+
+**Needs:** impl
+
+---
+
+## dsn~status-overview-reporting~1
+
+**Title:** Per-status coverage in HTML and text reports
+
+**Description:** The HTML report shall render a "Coverage by item status" table in the summary (items, covered, percentage, counted or not) and mark excluded items with a "not counted" badge in the card and table views. The plain-text report shall print one summary row per status with a counted/not-counted marker and tag excluded items in the item listing.
+
+**Covers:** req~status-coverage-overview~1
+
+**Status:** draft
+
+**Rationale:** Both report formats are used in CI and review workflows, so the status overview must be available in each without changing their established structure.
+
+**Tags:** architecture, reporting, status
+
+**Needs:** impl
+
+---
+
+## dsn~status-check-policy-config~1
+
+**Title:** Status policy configuration and check application
+
+**Description:** The configuration shall provide a `[status]` section (`count` list, `[status.check]` map of status to `fail`/`ignore`) with defaults of counting `proposed` and `approved`, ignoring `draft` and `rejected` in the check, and failing unlisted statuses. The tracer shall derive the number of defects that violate the policy, and `cargo ovft --check` shall use that count for its exit code, reporting excluded defects as informational.
+
+**Covers:** req~status-check-policy~1
+
+**Status:** draft
+
+**Rationale:** Keeping the policy in the configuration makes the check behavior inspectable and versioned alongside the requirements it gates.
+
+**Tags:** architecture, configuration, ci
+
+**Needs:** impl

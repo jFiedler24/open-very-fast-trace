@@ -32,6 +32,7 @@ pub mod reporters;
 pub mod reqif;
 
 pub use config::Config;
+pub use config::StatusCheckPolicy;
 pub use core::{TraceResult, Tracer};
 pub use error::{Error, Result};
 
@@ -39,4 +40,5 @@ pub use error::{Error, Result};
 pub use crate::core::{
     CoverageStatus, CoverageSummary, Defect, DefectType, ItemStatus, LinkStatus,
     LinkedSpecificationItem, Location, SpecificationItem, SpecificationItemId,
+    StatusCoverageSummary,
 };
